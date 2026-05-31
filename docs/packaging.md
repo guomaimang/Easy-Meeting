@@ -67,18 +67,27 @@ Easy Meeting.app/
     Helpers/
       easy-meeting-ast-helper           # 火山 Go helper
       node                              # 内置 Node（仅分发包）
-      AzureSpeechHelper/
+    Resources/
+      AzureSpeechHelper/                # Azure helper（纯资源，避免 codesign 误判）
         index.js
         azureTranslation.js
         package.json
         node_modules/                   # Azure SDK，纯 JS
 ```
 
+> Azure helper 放在 `Contents/Resources/` 而非 `Contents/Helpers/`：其 `node_modules`
+> 内含大量 `package.json`，若置于会被 codesign 递归扫描的位置，会被误判为嵌套
+> bundle 而导致整包签名失败。`Resources/` 是 codesign 认可的纯资源目录，不递归当
+> 代码处理。
+
 ## 代码签名说明
 
 分发包使用 **Ad-hoc 签名**（`codesign -s -`），不依赖付费 Apple Developer 账号。
 签名顺序为先内层后外层：先逐个签 `node`、`easy-meeting-ast-helper`、`EasyMeeting`，
 最后整包签名。顺序颠倒会使外层签名失效。
+
+不使用 `--deep`：内层三个 Mach-O 已逐个显式签名，Azure helper 的 `node_modules`
+是纯资源，由外层签名作为资源封入。`--deep` 会误把资源当代码递归处理而报错。
 
 Ad-hoc 签名未经 Apple 公证，目标机器首次打开会被 Gatekeeper 拦截。这是内部分发的
 预期代价，接收方按下节做一次去隔离即可。
@@ -130,5 +139,5 @@ otool -L "$APP/Contents/Helpers/node"
 ls "$APP/Contents/MacOS/EasyMeeting"
 ls "$APP/Contents/Helpers/easy-meeting-ast-helper"
 ls "$APP/Contents/Helpers/node"
-ls "$APP/Contents/Helpers/AzureSpeechHelper/index.js"
+ls "$APP/Contents/Resources/AzureSpeechHelper/index.js"
 ```

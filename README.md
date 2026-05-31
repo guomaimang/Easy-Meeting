@@ -68,6 +68,28 @@ zsh scripts/package-app.sh
 .build/debug/Easy Meeting.app
 ```
 
+以上为本机开发组装（debug、使用系统 Node、不签名）。要拷到其他 Apple Silicon
+Mac 上使用，请改用分发打包：
+
+```bash
+zsh scripts/dist-app.sh
+```
+
+生成自包含、Ad-hoc 签名、内置 Node 的产物：
+
+```text
+.build/release/Easy Meeting.app
+.build/release/Easy Meeting.zip
+```
+
+接收方解压后拖入 `/Applications`，首次打开前去隔离一次：
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Easy Meeting.app"
+```
+
+详见 `docs/packaging.md`。
+
 启动后如果没有配置火山凭证，应用会自动打开设置窗口。应用同时会在 macOS 顶部菜单栏显示 `Easy Meeting` 入口，可从这里打开设置、开始录音、选择麦克风和查看最近会议。
 
 ## 数据目录
