@@ -148,8 +148,10 @@ Easy Meeting 只需要 S2T，不需要服务端合成语音。
 
 AST 会分别返回原文字幕和译文字幕，每一侧都有 start、response、end 三类事件。Easy Meeting 的展示和落库规则如下：
 
+- helper 必须等到 `SessionStarted` 后再发送音频；建联成功前收到的麦克风音频只能短暂缓存。
+- helper 按官方建议把 16kHz、16bit、单声道 PCM 切成约 80ms 的 `TaskRequest` 包，避免系统音频回调帧过大导致服务端延迟出字幕。
 - `SourceSubtitleResponse` 和 `TranslationSubtitleResponse` 只更新当前草稿行，悬浮窗必须实时刷新同一行。
 - `SourceSubtitleEnd` 只确认原文草稿，不单独提交最终字幕。
-- `TranslationSubtitleEnd` 作为一次完整双语字幕的提交点；如果译文先结束，则等待源字幕结束时再提交。
+- `TranslationSubtitleEnd` 作为一次完整双语字幕的唯一提交点；源文事件无论先后都不能触发提交。
 - 同一段字幕提交后，后续重复 end 事件只能更新草稿状态，不能再次追加行或写入数据库。
 - Swift 展示层和落库层保留文本指纹兜底，防止服务端重发或 helper 异常导致重复最终文本。

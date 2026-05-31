@@ -19,6 +19,8 @@ import (
 	"code.byted.org/data-speech/wsclientsdk/protogen/products/understanding/base"
 )
 
+const audioChunkBytes = 16000 * 2 * 80 / 1000
+
 type astClient struct {
 	out            *output
 	mu             sync.Mutex
@@ -28,9 +30,9 @@ type astClient struct {
 	targetLanguage string
 	currentSource  string
 	currentTarget  string
-	sourceFinal    bool
-	targetFinal    bool
 	finalEmitted   bool
+	sessionStarted bool
+	audioBuffer    []byte
 }
 
 func newASTClient(out *output) *astClient {
@@ -66,9 +68,9 @@ func (c *astClient) start(cmd command) error {
 	}
 	c.currentSource = ""
 	c.currentTarget = ""
-	c.sourceFinal = false
-	c.targetFinal = false
 	c.finalEmitted = false
+	c.sessionStarted = false
+	c.audioBuffer = c.audioBuffer[:0]
 
 	req := &ast.TranslateRequest{
 		RequestMeta: &rpcmeta.RequestMeta{SessionID: c.sessionID},
@@ -79,7 +81,7 @@ func (c *astClient) start(cmd command) error {
 			Platform: "macos",
 		},
 		SourceAudio: &base.Audio{
-			Format:  "pcm",
+			Format:  "wav",
 			Codec:   "raw",
 			Rate:    16000,
 			Bits:    16,
@@ -110,15 +112,37 @@ func (c *astClient) sendAudio(data []byte, timestamp int) error {
 	if c.conn == nil {
 		return fmt.Errorf("session not started")
 	}
+	if len(data) == 0 {
+		return nil
+	}
 
+	c.audioBuffer = append(c.audioBuffer, data...)
+	if !c.sessionStarted {
+		return nil
+	}
+	return c.flushAudioChunksLocked(false)
+}
+
+func (c *astClient) flushAudioChunksLocked(flushRemainder bool) error {
 	req := &ast.TranslateRequest{
 		RequestMeta: &rpcmeta.RequestMeta{SessionID: c.sessionID},
 		Event:       event.Type_TaskRequest,
-		SourceAudio: &base.Audio{BinaryData: data},
 	}
 
-	if err := send(c.conn, req); err != nil {
-		return fmt.Errorf("send audio: %w", err)
+	for len(c.audioBuffer) >= audioChunkBytes {
+		req.SourceAudio = &base.Audio{BinaryData: append([]byte(nil), c.audioBuffer[:audioChunkBytes]...)}
+		if err := send(c.conn, req); err != nil {
+			return fmt.Errorf("send audio: %w", err)
+		}
+		c.audioBuffer = c.audioBuffer[audioChunkBytes:]
+	}
+
+	if flushRemainder && len(c.audioBuffer) > 0 {
+		req.SourceAudio = &base.Audio{BinaryData: append([]byte(nil), c.audioBuffer...)}
+		if err := send(c.conn, req); err != nil {
+			return fmt.Errorf("send audio remainder: %w", err)
+		}
+		c.audioBuffer = c.audioBuffer[:0]
 	}
 	return nil
 }
@@ -129,6 +153,11 @@ func (c *astClient) finish() error {
 
 	if c.conn == nil {
 		return nil
+	}
+	if c.sessionStarted {
+		if err := c.flushAudioChunksLocked(true); err != nil {
+			return err
+		}
 	}
 
 	req := &ast.TranslateRequest{
@@ -157,6 +186,10 @@ func (c *astClient) receiveLoop(conn *websocket.Conn) {
 func (c *astClient) handleResponse(resp *ast.TranslateResponse) bool {
 	switch resp.GetEvent() {
 	case event.Type_SessionStarted:
+		if err := c.markSessionStarted(); err != nil {
+			c.out.send(helperEvent{Type: "error", Message: err.Error()})
+			return true
+		}
 		c.out.send(helperEvent{Type: "status", Message: "session_started"})
 	case event.Type_SessionFailed:
 		c.out.send(helperEvent{Type: "error", Message: resp.GetResponseMeta().GetMessage()})
@@ -169,24 +202,16 @@ func (c *astClient) handleResponse(resp *ast.TranslateResponse) bool {
 		return true
 	case event.Type_SourceSubtitleStart:
 		c.currentSource = ""
-		c.sourceFinal = false
-		c.finalEmitted = false
 	case event.Type_SourceSubtitleResponse, event.Type_SourceSubtitleEnd:
 		c.currentSource = mergeSubtitleText(c.currentSource, resp.GetText())
-		isFinal := false
-		if resp.GetEvent() == event.Type_SourceSubtitleEnd {
-			c.sourceFinal = true
-			isFinal = c.consumeFinalIfReady()
-		}
-		c.out.send(c.subtitleEvent(resp, c.currentSource, c.currentTarget, isFinal))
+		c.out.send(c.subtitleEvent(resp, c.currentSource, c.currentTarget, false))
 	case event.Type_TranslationSubtitleStart:
 		c.currentTarget = ""
-		c.targetFinal = false
+		c.finalEmitted = false
 	case event.Type_TranslationSubtitleResponse, event.Type_TranslationSubtitleEnd:
 		c.currentTarget = mergeSubtitleText(c.currentTarget, resp.GetText())
 		isFinal := false
 		if resp.GetEvent() == event.Type_TranslationSubtitleEnd {
-			c.targetFinal = true
 			isFinal = c.consumeFinalIfReady()
 		}
 		c.out.send(c.subtitleEvent(resp, c.currentSource, c.currentTarget, isFinal))
@@ -196,11 +221,16 @@ func (c *astClient) handleResponse(resp *ast.TranslateResponse) bool {
 	return false
 }
 
+func (c *astClient) markSessionStarted() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.sessionStarted = true
+	return c.flushAudioChunksLocked(false)
+}
+
 func (c *astClient) consumeFinalIfReady() bool {
-	if c.finalEmitted || !c.targetFinal || strings.TrimSpace(c.currentTarget) == "" {
-		return false
-	}
-	if !c.sourceFinal && strings.TrimSpace(c.currentSource) == "" {
+	if c.finalEmitted || strings.TrimSpace(c.currentTarget) == "" {
 		return false
 	}
 	c.finalEmitted = true

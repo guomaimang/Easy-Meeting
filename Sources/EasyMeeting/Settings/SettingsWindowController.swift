@@ -5,7 +5,6 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     let settingsStore: AppSettingsStore
     let audioDeviceManager: AudioDeviceManager
     let overlayController: OverlayWindowController
-    let sidebarStack = NSStackView()
     let contentContainer = SettingsBackgroundView()
     let providerPopUp = NSPopUpButton()
     let speechModePopUp = NSPopUpButton()
@@ -42,13 +41,15 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         self.overlayController = overlayController
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 920, height: 620),
+            contentRect: NSRect(x: 0, y: 0, width: 840, height: 560),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
         )
         window.title = "Easy Meeting 设置"
-        window.contentView = SettingsBackgroundView(frame: NSRect(x: 0, y: 0, width: 920, height: 620))
+        window.minSize = NSSize(width: 840, height: 560)
+        window.isMovableByWindowBackground = true
+        window.contentView = SettingsBackgroundView(frame: NSRect(x: 0, y: 0, width: 840, height: 560))
         window.center()
 
         super.init(window: window)
@@ -107,6 +108,9 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
             section = SettingsSection(rawValue: sender.tag)
         }
         guard let section else { return }
+        #if DEBUG
+        NSLog("设置侧栏切换：%@", section.title)
+        #endif
         selectedSection = section
         renderSelectedSection()
     }
@@ -149,16 +153,16 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
 
         setupSidebar(in: contentView)
 
-        contentContainer.frame = NSRect(x: 220, y: 96, width: 660, height: 480)
+        contentContainer.frame = NSRect(x: 228, y: 84, width: 576, height: 400)
         contentContainer.wantsLayer = true
         contentView.addSubview(contentContainer)
 
-        statusLabel.frame = NSRect(x: 220, y: 38, width: 360, height: 24)
+        statusLabel.frame = NSRect(x: 228, y: 36, width: 360, height: 24)
         statusLabel.textColor = .secondaryLabelColor
         contentView.addSubview(statusLabel)
 
         let saveButton = NSButton(title: "保存", target: self, action: #selector(save))
-        saveButton.frame = NSRect(x: 800, y: 34, width: 80, height: 30)
+        saveButton.frame = NSRect(x: 724, y: 32, width: 80, height: 30)
         contentView.addSubview(saveButton)
 
         providerPopUp.addItems(withTitles: SpeechProvider.allCases.map(\.title))
