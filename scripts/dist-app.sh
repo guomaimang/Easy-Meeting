@@ -40,6 +40,7 @@ echo "==> 组装 app 包"
 rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$HELPERS_DIR" "$RESOURCES_DIR"
 cp Packaging/Info.plist "$CONTENTS_DIR/Info.plist"
+cp Packaging/AppIcon.icns "$RESOURCES_DIR/AppIcon.icns"
 cp .build/release/EasyMeeting "$MACOS_DIR/EasyMeeting"
 cp .build/release/easy-meeting-ast-helper "$HELPERS_DIR/easy-meeting-ast-helper"
 

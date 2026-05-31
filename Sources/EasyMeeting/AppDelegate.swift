@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindowController: SettingsWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        ProcessInfo.processInfo.disableAutomaticTermination("Easy Meeting 需要常驻状态栏")
         setupMainMenu()
 
         let audioDeviceManager = AudioDeviceManager()

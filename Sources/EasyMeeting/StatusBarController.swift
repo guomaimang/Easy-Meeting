@@ -135,8 +135,44 @@ final class StatusBarController: NSObject {
         statusItem.button?.toolTip = "Easy Meeting 会议助手"
         statusItem.button?.font = .systemFont(ofSize: 13, weight: .semibold)
         statusItem.button?.isEnabled = true
+        statusItem.isVisible = true
         NSLog("菜单栏状态项已创建：EM")
+        logStatusItemDiagnostics(stage: "init")
+        // run loop 起来后再测一次，确认 button 是否真正落到菜单栏窗口里。
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            self?.logStatusItemDiagnostics(stage: "delayed")
+        }
         rebuildMenu()
+    }
+
+    /// 诊断菜单栏图标不显示问题：打印 status item 与运行环境的真实状态。
+    private func logStatusItemDiagnostics(stage: String) {
+        let button = statusItem.button
+        let policy = NSApp.activationPolicy().rawValue
+        let bundleID = Bundle.main.bundleIdentifier ?? "<无>"
+        let isBundled = Bundle.main.bundlePath.hasSuffix(".app")
+        let thickness = NSStatusBar.system.thickness
+        let line = """
+        [状态栏诊断:\(stage)] button=\(button == nil ? "nil" : "存在") \
+        isVisible=\(statusItem.isVisible) length=\(statusItem.length) \
+        buttonFrame=\(button.map { "\($0.frame)" } ?? "nil") \
+        hasWindow=\(button?.window != nil) \
+        activationPolicy=\(policy) bundleID=\(bundleID) isBundled=\(isBundled) \
+        barThickness=\(thickness) bundlePath=\(Bundle.main.bundlePath)
+        """
+        NSLog(line)
+        // NSLog 在非 TTY 下走 os_log，抓取不稳定；同步写文件确保可对比。
+        let entry = "\(Date()) \(line)\n"
+        if let data = entry.data(using: .utf8) {
+            let url = URL(fileURLWithPath: "/tmp/em_diag.log")
+            if let handle = try? FileHandle(forWritingTo: url) {
+                handle.seekToEndOfFile()
+                handle.write(data)
+                try? handle.close()
+            } else {
+                try? data.write(to: url)
+            }
+        }
     }
 
     private func rebuildMenu() {

@@ -7,6 +7,8 @@
   <string>zh_CN</string>
   <key>CFBundleExecutable</key>
   <string>EasyMeeting</string>
+  <key>CFBundleIconFile</key>
+  <string>AppIcon</string>
   <key>CFBundleIdentifier</key>
   <string>com.easymeeting.mac</string>
   <key>CFBundleInfoDictionaryVersion</key>
@@ -21,8 +23,6 @@
   <string>1</string>
   <key>LSMinimumSystemVersion</key>
   <string>14.0</string>
-  <key>LSUIElement</key>
-  <true/>
   <key>NSHighResolutionCapable</key>
   <true/>
   <key>NSMicrophoneUsageDescription</key>

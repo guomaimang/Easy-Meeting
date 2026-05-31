@@ -68,6 +68,7 @@ Easy Meeting.app/
       easy-meeting-ast-helper           # 火山 Go helper
       node                              # 内置 Node（仅分发包）
     Resources/
+      AppIcon.icns                      # 应用图标
       AzureSpeechHelper/                # Azure helper（纯资源，避免 codesign 误判）
         index.js
         azureTranslation.js
@@ -110,9 +111,31 @@ xattr -dr com.apple.quarantine "/Applications/Easy Meeting.app"
 在 Finder 中右键点击 `Easy Meeting.app` → 打开 → 在弹窗中再次点击「打开」。
 首次放行后，后续可直接双击。
 
-## 权限
+## 应用图标
 
-应用是菜单栏常驻应用（`LSUIElement`），启动后在顶部菜单栏显示 `Easy Meeting` 入口。
+图标源为根目录的 `logo.png`（青绿对话气泡），生成流程已固化为脚本：
+
+```bash
+zsh scripts/build-icon.sh            # 默认用 logo.png
+zsh scripts/build-icon.sh other.png  # 也可指定其他源图
+```
+
+流程：`scripts/make-icon.swift` 用 CoreGraphics 合成 1024 底图（白色圆角底板 +
+logo 居中），再经 `sips` 生成各尺寸、`iconutil` 打包为 `Packaging/AppIcon.icns`。
+
+两个打包脚本都会把 `AppIcon.icns` 复制到 `Contents/Resources/`，`Info.plist` 通过
+`CFBundleIconFile` 声明。换 logo 后重跑 `build-icon.sh` 再打包即可。
+
+> 若替换图标后 Finder 仍显示旧图，是 LaunchServices 缓存所致。重新打包并执行
+> `lsregister -f "<path>/Easy Meeting.app"` 可刷新。
+
+## 菜单栏与权限
+
+应用在入口代码中使用 `.accessory` activation policy，保持无 Dock 常驻状态栏的使用方式。
+`Info.plist` 不声明 `LSUIElement`，避免 `.app` 由 LaunchServices 启动时被当作 agent 应用，
+导致标准应用菜单栏不显示。启动后右上角状态栏显示 `EM` 入口，应用窗口获得焦点时显示
+`Easy Meeting` 与「编辑」菜单。
+
 首次开始录音时，系统会请求麦克风权限，需在「系统设置 → 隐私与安全性 → 麦克风」中授权。
 
 ## 系统要求

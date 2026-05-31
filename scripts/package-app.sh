@@ -14,6 +14,8 @@ AZURE_HELPER_DST="$HELPERS_DIR/AzureSpeechHelper"
 rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$HELPERS_DIR"
 cp Packaging/Info.plist "$CONTENTS_DIR/Info.plist"
+mkdir -p "$CONTENTS_DIR/Resources"
+cp Packaging/AppIcon.icns "$CONTENTS_DIR/Resources/AppIcon.icns"
 cp .build/debug/EasyMeeting "$MACOS_DIR/EasyMeeting"
 cp .build/debug/easy-meeting-ast-helper "$HELPERS_DIR/easy-meeting-ast-helper"
 
