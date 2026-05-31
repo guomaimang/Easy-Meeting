@@ -49,10 +49,12 @@ final class OverlayView: NSView {
     }
 
     override func hitTest(_ point: NSPoint) -> NSView? {
-        guard bounds.contains(point) else { return nil }
+        // hitTest 传入的 point 处于父视图坐标系，而本视图 isFlipped=true，
+        // 必须先换算到自身坐标系，否则左上角录音按钮的命中区会被算到别处。
+        let local = superview.map { convert(point, from: $0) } ?? point
+        guard bounds.contains(local) else { return nil }
         // 录音按钮优先接收点击，其余区域留给拖拽 / 缩放。
-        let pointInButton = convert(point, to: recordButton)
-        if recordButton.bounds.contains(pointInButton) {
+        if recordButton.frame.contains(local) {
             return recordButton
         }
         return self

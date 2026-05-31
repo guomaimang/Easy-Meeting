@@ -1,4 +1,4 @@
-@preconcurrency import AVFoundation
+ @preconcurrency import AVFoundation
 
 final class AudioRecorder: NSObject {
     private let captureQueue = DispatchQueue(label: "easy-meeting.audio.capture")
@@ -75,23 +75,29 @@ final class AudioRecorder: NSObject {
 
         isRecording = false
         let writerBox = writer.map(AssetWriterBox.init)
-        let writerInput = writerInput
+        let writerInputBox = writerInput.map(AssetWriterInputBox.init)
         let didWriteAudio = didStartWriting
+        // stopCaptureOnly 会先摘掉采集 delegate，之后不再有新的音频帧入队。
         stopCaptureOnly()
 
-        guard didWriteAudio else {
-            writerBox?.writer.cancelWriting()
-            NSLog("录音停止：尚未收到音频帧，跳过音频文件收尾。")
-            completion(.success(()))
-            return
-        }
-
-        writerInput?.markAsFinished()
-        writerBox?.writer.finishWriting {
-            if let error = writerBox?.writer.error {
-                completion(.failure(AudioRecordingError.writerFailed(error.localizedDescription)))
-            } else {
+        // 收尾派发到 captureQueue 末尾：借串行队列的 FIFO 顺序，
+        // 保证任何在途 append 先执行完，杜绝「markAsFinished 之后又 append」
+        // 触发的写入报错——正是这个竞态导致停止成功却误报「停止录音失败」。
+        captureQueue.async {
+            guard didWriteAudio else {
+                writerBox?.writer.cancelWriting()
+                NSLog("录音停止：尚未收到音频帧，跳过音频文件收尾。")
                 completion(.success(()))
+                return
+            }
+
+            writerInputBox?.input.markAsFinished()
+            writerBox?.writer.finishWriting {
+                if let error = writerBox?.writer.error {
+                    completion(.failure(AudioRecordingError.writerFailed(error.localizedDescription)))
+                } else {
+                    completion(.success(()))
+                }
             }
         }
     }
@@ -132,6 +138,14 @@ private final class AssetWriterBox: @unchecked Sendable {
 
     init(writer: AVAssetWriter) {
         self.writer = writer
+    }
+}
+
+private final class AssetWriterInputBox: @unchecked Sendable {
+    let input: AVAssetWriterInput
+
+    init(input: AVAssetWriterInput) {
+        self.input = input
     }
 }
 
