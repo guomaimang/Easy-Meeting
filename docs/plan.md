@@ -36,7 +36,7 @@ Easy Meeting 的目标是完整 macOS 本地会议助手产品，不是一次性
 
 - 设置窗口保存火山 App Key、Access Key 和 Resource ID。
 - 录音开始时建立 AST WebSocket 连接。
-- 使用 SwiftProtobuf 生成 AST 协议类型。
+- 通过 Go helper 复用官方 AST 客户端协议实现。
 - 音频帧统一为 PCM 16kHz、单声道、16bit 后再发送。
 - 发送 `StartSession`、`TaskRequest` 音频帧和 `FinishSession`。
 - 解析源语言字幕和目标语言字幕事件。
@@ -86,7 +86,7 @@ Easy Meeting 的目标是完整 macOS 本地会议助手产品，不是一次性
 
 ## 产品化待办
 
-- 火山 AST 响应事件分组、字幕配对和错误恢复。
+- Go helper 的火山 AST 响应事件分组、字幕配对和错误恢复。
 - 音频采集管道拆分，让录音和实时语音服务共享同一份采集帧。
 - 删除或隔离所有用户可见的模拟服务入口，内部测试替身不得进入默认产品路径。
 - 会议元数据补齐模式、源语言、目标语言和服务商信息。

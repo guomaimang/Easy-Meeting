@@ -9,4 +9,4 @@
 
 ## 验证
 
-- 待执行 `swift build`。
+- `swift build` 通过。

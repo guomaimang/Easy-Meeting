@@ -24,7 +24,7 @@ Easy Meeting 是一个完整的 macOS 本地会议助手产品。
 - 音频采集：AVFoundation / AVAudioEngine。
 - 本地数据库：SQLite。
 - 本地文件：Application Support 目录。
-- AST 协议编解码：SwiftProtobuf。
+- AST 协议编解码：随 App 打包的 Go helper。
 - 密钥保存：Keychain。
 - 普通配置：UserDefaults。
 - 日志：开发环境 DEBUG 级别，生产环境 INFO 级别。

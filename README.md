@@ -95,8 +95,8 @@ zsh scripts/package-app.sh
 - 创建 AST WebSocket 连接。
 - 接收 WebSocket 消息和错误反馈。
 - 录音时把采集到的音频帧交给语音客户端。
-- 使用 SwiftProtobuf 构建期生成 AST 协议类型。
-- 发送 AST `StartSession`、`TaskRequest` 和 `FinishSession` protobuf 消息。
+- 通过 Go helper 复用火山 AST 官方示例协议实现。
+- Swift 主 App 通过 JSON Lines 与 helper 通信。
 
 尚未完成：
 
@@ -104,7 +104,7 @@ zsh scripts/package-app.sh
 - 完整的字幕配对、断线重连、失败重试和错误分级。
 - 连接重试、错误分级、服务不可用时的用户可理解恢复路径。
 
-火山同声传译 2.0 文档显示业务消息使用 protobuf，因此真实接入使用 SwiftProtobuf 基于官方 proto 生成 Swift 类型后继续完成。
+火山同声传译 2.0 文档显示业务消息使用 protobuf。Easy Meeting 通过随 App 打包的 Go helper 复用官方 Go 示例客户端协议实现，Swift 主 App 只处理领域化字幕、状态和错误事件。
 
 ## 屏幕共享说明
 

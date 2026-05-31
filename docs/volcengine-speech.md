@@ -4,6 +4,7 @@
 
 - 实时语音翻译 API：https://www.volcengine.com/docs/6561/1756902?lang=zh
 - Doubao 语音识别 Realtime API：https://www.volcengine.com/docs/6561/1354869
+- 本地 AST 2.0 接入摘要：`docs/volcengine-ast-api.md`
 
 ## 结论
 
@@ -90,13 +91,12 @@ Easy Meeting 只需要 S2T，不需要服务端合成语音。
 ## 当前实现状态
 
 - 已新增 Speech 领域模型。
-- 已新增火山 AST WebSocket 客户端骨架，支持读取设置中的 API Key 和 Resource ID 建连。
+- 火山 AST 接入改为 Go helper 二进制进程，Swift 主 App 不直接处理 AST protobuf。
 - 开始录音后会把麦克风音频帧交给语音客户端。
 - 音频采集出口统一为 PCM 16kHz、单声道、16bit，小端有符号整型。
-- AST 业务消息使用 protobuf，项目采用 SwiftProtobuf 生成 Swift 类型并完成编解码。
-- 已发送 `StartSession`、`TaskRequest` 和 `FinishSession` protobuf 消息。
-- 已解析 AST protobuf 响应，并把字幕事件转换为 `RealtimeSpeechEvent`。
-- 仍需真实账号和会议语料验证事件时序、字幕配对、音频格式和错误恢复。
+- Go helper 复用 `ref/_extracted/go/ast_go` 官方示例模块中的 AST proto 和协议依赖。
+- Swift 与 Go helper 通过 JSON Lines 通信，Swift 只接收领域化字幕、状态和错误事件。
+- 仍需真实账号和会议语料验证事件时序、字幕配对和错误恢复。
 
 ## AST 参考客户端结论
 
@@ -117,16 +117,16 @@ Easy Meeting 只需要 S2T，不需要服务端合成语音。
   4. 停止时发送 `FinishSession`
   5. 服务端返回字幕事件和 `SessionFinished`
 
-Swift 客户端必须使用 SwiftProtobuf 生成 AST 协议类型，不手写 protobuf 二进制 codec。生成代码应放在 Speech 基础设施边界内，UI、存储和导出模块只依赖 `RealtimeSpeechEvent` 等领域模型。
+详细鉴权、事件码、语种约束、音频格式和错误码见 `docs/volcengine-ast-api.md`。本地文档记录了新版 `X-Api-Key` 与样例 `X-Api-App-Key` 的字段差异，真实接入时必须用控制台账号联调确认。
 
-## SwiftProtobuf 方案
+## Go helper 方案
 
-- SwiftPM 引入 `apple/swift-protobuf` 的 `SwiftProtobuf` 运行时，并固定版本以保证构建可重复。
-- 使用官方 AST proto 生成 `TranslateRequest`、`TranslateResponse` 和相关事件类型。
-- `.proto` 文件按服务商边界放入 `Sources/EasyMeeting/Speech/Volcengine/Protos/`。
-- SwiftProtobuf 插件在构建时生成 Swift 文件，避免提交超大生成代码。
-- 业务代码只在 `VolcengineASTSpeechClient` 和火山协议适配层内引用生成类型。
-- 后续 proto 更新只修改 `Protos/` 和 `swift-protobuf-config.json`，构建过程保持可重复。
+- Swift 主 App 负责 macOS UI、麦克风权限、设备选择、录音、SQLite、导出和设置。
+- Go helper 负责火山 AST WebSocket、Header、protobuf 编解码、会话事件和字幕事件解析。
+- helper 随 `.app` 打包到 `Contents/Helpers/easy-meeting-ast-helper`。
+- Swift 通过 stdin/stdout JSON Lines 向 helper 发送 `start`、`audio`、`finish`、`stop` 命令。
+- helper 向 Swift 返回 `status`、`subtitle`、`error` 事件。
+- 旧的 Swift 原生 AST 客户端路线已删除，不再维护 SwiftProtobuf 生成配置。
 
 ## 音频管道设计
 
