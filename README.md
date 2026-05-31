@@ -95,12 +95,13 @@ zsh scripts/package-app.sh
 - 创建 AST WebSocket 连接。
 - 接收 WebSocket 消息和错误反馈。
 - 录音时把采集到的音频帧交给语音客户端。
+- 使用 SwiftProtobuf 构建期生成 AST 协议类型。
+- 发送 AST `StartSession`、`TaskRequest` 和 `FinishSession` protobuf 消息。
 
 尚未完成：
 
-- 使用 SwiftProtobuf 生成 AST protobuf 类型并完成消息编解码。
-- 麦克风音频帧转换为 AST 要求的协议包。
-- 真实识别/翻译事件解析。
+- 真实账号环境下验证音频格式、字幕事件时序和翻译质量。
+- 完整的字幕配对、断线重连、失败重试和错误分级。
 - 连接重试、错误分级、服务不可用时的用户可理解恢复路径。
 
 火山同声传译 2.0 文档显示业务消息使用 protobuf，因此真实接入使用 SwiftProtobuf 基于官方 proto 生成 Swift 类型后继续完成。

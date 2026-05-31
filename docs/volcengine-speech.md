@@ -93,7 +93,9 @@ Easy Meeting 只需要 S2T，不需要服务端合成语音。
 - 已新增火山 AST WebSocket 客户端骨架，支持读取设置中的 API Key 和 Resource ID 建连。
 - 开始录音后会把麦克风音频帧交给语音客户端。
 - AST 业务消息使用 protobuf，项目采用 SwiftProtobuf 生成 Swift 类型并完成编解码。
-- 当前客户端只能反馈连接状态和 WebSocket 错误，不能作为完整实时字幕能力交付。
+- 已发送 `StartSession`、`TaskRequest` 和 `FinishSession` protobuf 消息。
+- 已解析 AST protobuf 响应，并把字幕事件转换为 `RealtimeSpeechEvent`。
+- 仍需真实账号和会议语料验证事件时序、字幕配对、音频格式和错误恢复。
 
 ## AST 参考客户端结论
 
@@ -120,9 +122,10 @@ Swift 客户端必须使用 SwiftProtobuf 生成 AST 协议类型，不手写 pr
 
 - SwiftPM 引入 `apple/swift-protobuf` 的 `SwiftProtobuf` 运行时，并固定版本以保证构建可重复。
 - 使用官方 AST proto 生成 `TranslateRequest`、`TranslateResponse` 和相关事件类型。
-- 生成文件按服务商边界放入 `Sources/EasyMeeting/Speech/Volcengine/Generated/`。
+- `.proto` 文件按服务商边界放入 `Sources/EasyMeeting/Speech/Volcengine/Protos/`。
+- SwiftProtobuf 插件在构建时生成 Swift 文件，避免提交超大生成代码。
 - 业务代码只在 `VolcengineASTSpeechClient` 和火山协议适配层内引用生成类型。
-- 后续补充固定的生成脚本，确保 proto 更新和 Swift 代码生成可重复。
+- 后续 proto 更新只修改 `Protos/` 和 `swift-protobuf-config.json`，构建过程保持可重复。
 
 ## 音频管道设计
 

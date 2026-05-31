@@ -38,7 +38,7 @@ struct VolcengineASTProtocol {
     }
 
     func decodeResponse(_ data: Data) throws -> VolcengineASTResponse {
-        let response = try Data_Speech_Ast_TranslateResponse(serializedData: data)
+        let response = try Data_Speech_Ast_TranslateResponse(serializedBytes: data)
         return VolcengineASTResponse(response: response)
     }
 

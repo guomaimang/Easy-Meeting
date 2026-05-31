@@ -20,6 +20,9 @@ let package = Package(
                 .product(name: "SwiftProtobuf", package: "swift-protobuf")
             ],
             path: "Sources/EasyMeeting",
+            resources: [
+                .copy("swift-protobuf-config.json")
+            ],
             plugins: [
                 .plugin(name: "SwiftProtobufPlugin", package: "swift-protobuf")
             ]
