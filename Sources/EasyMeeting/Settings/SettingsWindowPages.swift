@@ -87,7 +87,7 @@ extension SettingsWindowController {
     private func buildAzureKeyGroup(_ keyGroup: NSView) {
         addRowTitle("区域 Region", to: keyGroup, y: 74)
         regionField.frame = NSRect(x: 220, y: 73, width: 230, height: 24)
-        regionField.placeholderString = "如 eastasia"
+        regionField.placeholderString = AppSettings.defaults.azureSpeechRegion
         regionField.delegate = self
         keyGroup.addSubview(regionField)
         addDivider(to: keyGroup, y: 54)

@@ -26,10 +26,6 @@ final class AzureHelperSpeechClient: SpeechClient, @unchecked Sendable {
             emitStatus("Azure 未配置", "请先在设置里填写语音密钥。")
             return
         }
-        guard settings.azureSpeechRegion.isEmpty == false else {
-            emitStatus("Azure 未配置", "请先在设置里填写区域。")
-            return
-        }
 
         let validation = configuration.validation
         guard validation.isValid else {
@@ -55,7 +51,7 @@ final class AzureHelperSpeechClient: SpeechClient, @unchecked Sendable {
             try launchHelper(node: nodeURL, script: scriptURL)
             try send(AzureHelperCommand.start(
                 speechKey: settings.azureSpeechKey,
-                region: settings.azureSpeechRegion,
+                region: settings.effectiveAzureSpeechRegion,
                 sourceLanguage: sourceCode,
                 targetLanguage: targetCode,
                 meetingID: meetingID.uuidString

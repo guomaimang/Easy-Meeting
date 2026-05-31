@@ -2,6 +2,18 @@ import Foundation
 
 @MainActor
 final class MeetingSessionController {
+    enum RecordingState {
+        case idle
+        case starting
+        case recording
+        case stopping
+
+        var isRecordingVisible: Bool {
+            self == .recording || self == .stopping
+        }
+    }
+
+    private static let autoStopInterval: TimeInterval = 4 * 60 * 60
     private let audioDeviceManager: AudioDeviceManager
     private let audioRecorder: AudioRecorder
     private let meetingStore: MeetingStore
@@ -9,13 +21,15 @@ final class MeetingSessionController {
     private var speechClient: SpeechClient?
     private var subtitleDisplay = SubtitleDisplayBuffer()
     private var lastStoredTranscriptKey: String?
+    private var autoStopTimer: Timer?
+    private(set) var recordingState: RecordingState = .idle
 
     var speechMode: SpeechMode {
         settingsStore.settings.speechMode
     }
 
     var isRecording: Bool {
-        audioRecorder.isRecording
+        recordingState == .recording
     }
 
     init(
@@ -31,8 +45,17 @@ final class MeetingSessionController {
     }
 
     func start(onStatus: @escaping @MainActor (String, String) -> Void, onMenuUpdate: @escaping @MainActor () -> Void) {
+        guard recordingState == .idle else {
+            onStatus("录音操作进行中", recordingState == .stopping ? "正在停止录音，请稍后再开始。" : "正在启动录音，请稍候。")
+            return
+        }
+
+        recordingState = .starting
         subtitleDisplay.reset()
         lastStoredTranscriptKey = nil
+        cancelAutoStopTimer()
+        onMenuUpdate()
+
         Task { @MainActor in
             do {
                 _ = await audioDeviceManager.requestPermission()
@@ -53,11 +76,16 @@ final class MeetingSessionController {
                         client.sendAudioFrame(frame)
                     }
                 }
+                recordingState = .recording
+                scheduleAutoStop(onStatus: onStatus, onMenuUpdate: onMenuUpdate)
                 onStatus(
                     "正在录音：\(audioDeviceManager.selectedDeviceName())",
-                    "\(configuration.title)：音频保存到 \(meeting.audioURL.lastPathComponent)"
+                    "\(configuration.title)：4 小时后自动结束，音频保存到 \(meeting.audioURL.lastPathComponent)"
                 )
             } catch {
+                speechClient?.stop()
+                speechClient = nil
+                recordingState = .idle
                 onStatus("录音启动失败", error.localizedDescription)
             }
 
@@ -66,7 +94,17 @@ final class MeetingSessionController {
     }
 
     func stop(onStatus: @escaping @MainActor (String, String) -> Void, onMenuUpdate: @escaping @MainActor () -> Void) {
+        guard recordingState == .recording else {
+            onStatus("录音操作进行中", recordingState == .starting ? "正在启动录音，请稍后再停止。" : "正在停止录音，请稍候。")
+            return
+        }
+
+        recordingState = .stopping
+        cancelAutoStopTimer()
         speechClient?.stop()
+        speechClient = nil
+        onMenuUpdate()
+
         audioRecorder.stopRecording { [weak self] result in
             Task { @MainActor in
                 guard let self else { return }
@@ -78,9 +116,28 @@ final class MeetingSessionController {
                     onStatus("停止录音失败", error.localizedDescription)
                 }
 
+                self.recordingState = .idle
                 onMenuUpdate()
             }
         }
+    }
+
+    private func scheduleAutoStop(
+        onStatus: @escaping @MainActor (String, String) -> Void,
+        onMenuUpdate: @escaping @MainActor () -> Void
+    ) {
+        autoStopTimer = Timer.scheduledTimer(withTimeInterval: Self.autoStopInterval, repeats: false) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, self.isRecording else { return }
+                onStatus("会议已达到 4 小时上限", "正在自动停止录音并保存会议文件。")
+                self.stop(onStatus: onStatus, onMenuUpdate: onMenuUpdate)
+            }
+        }
+    }
+
+    private func cancelAutoStopTimer() {
+        autoStopTimer?.invalidate()
+        autoStopTimer = nil
     }
 
     private func startSpeech(
@@ -146,89 +203,6 @@ final class MeetingSessionController {
             event.sourceLanguage,
             event.targetLanguage
         ].joined(separator: "\u{1F}")
-    }
-}
-
-private struct SubtitleDisplayBuffer {
-    private var committedSources: [String] = []
-    private var committedTranslations: [String] = []
-    private var currentSource = ""
-    private var currentTranslation = ""
-    private var lastCommittedSource = ""
-    private var lastCommittedTranslation = ""
-
-    mutating func reset() {
-        committedSources.removeAll(keepingCapacity: true)
-        committedTranslations.removeAll(keepingCapacity: true)
-        currentSource = ""
-        currentTranslation = ""
-        lastCommittedSource = ""
-        lastCommittedTranslation = ""
-    }
-
-    mutating func apply(_ event: RealtimeSpeechEvent) -> (source: String, translation: String) {
-        let source = event.sourceText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let translation = event.translatedText.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        switch event.kind {
-        case .sourceStart:
-            currentSource = ""
-        case .sourceInterim:
-            if source.isEmpty == false {
-                currentSource = source
-            }
-        case .sourceFinal:
-            if source.isEmpty == false {
-                currentSource = source
-            }
-            commitCurrentSource()
-        case .translationStart:
-            currentTranslation = ""
-        case .translationInterim:
-            if translation.isEmpty == false {
-                currentTranslation = translation
-            }
-        case .translationFinal:
-            if translation.isEmpty == false {
-                currentTranslation = translation
-            }
-            commitCurrentTranslation()
-        case .system:
-            break
-        }
-
-        return (
-            visibleLines(committedSources, currentSource).joined(separator: "\n"),
-            visibleLines(committedTranslations, currentTranslation).joined(separator: "\n")
-        )
-    }
-
-    private mutating func commitCurrentSource() {
-        let text = currentSource.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard text.isEmpty == false else { return }
-        if text != lastCommittedSource {
-            committedSources.append(text)
-            lastCommittedSource = text
-        }
-        currentSource = ""
-    }
-
-    private mutating func commitCurrentTranslation() {
-        let text = currentTranslation.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard text.isEmpty == false else { return }
-        if text != lastCommittedTranslation {
-            committedTranslations.append(text)
-            lastCommittedTranslation = text
-        }
-        currentTranslation = ""
-    }
-
-    private func visibleLines(_ committed: [String], _ current: String) -> [String] {
-        let draft = current.trimmingCharacters(in: .whitespacesAndNewlines)
-        if draft.isEmpty {
-            return committed
-        }
-        return committed + [draft]
     }
 }
 

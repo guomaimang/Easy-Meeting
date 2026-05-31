@@ -3,17 +3,17 @@ import AppKit
 @MainActor
 extension SettingsWindowController {
     @objc func changeSpeechMode() {
-        // 翻译预设仅用于火山快捷填充
-        guard selectedProvider() == .volcengine else { return }
-        let configuration = selectedSpeechMode().configuration
+        let configuration = selectedSpeechMode().configuration(for: selectedProvider())
         selectSourceCode(configuration.sourceCode)
         selectTargetCode(configuration.targetCode)
         updateSpeechModeDetail()
+        autosave()
     }
 
     @objc func changeSpeechLanguage() {
         selectMatchingSpeechModeIfNeeded()
         updateSpeechModeDetail()
+        autosave()
     }
 
     /// 按当前 provider 重新填充源/目标语种下拉框。
@@ -30,8 +30,8 @@ extension SettingsWindowController {
         selectSourceCode(SpeechLanguageCatalog.validatedSourceCode(sourceCode, for: provider))
         selectTargetCode(SpeechLanguageCatalog.validatedTargetCode(targetCode, for: provider))
 
-        // 翻译预设只对火山有意义
-        speechModePopUp.isEnabled = provider == .volcengine
+        reloadSpeechModePopUp()
+        selectMatchingSpeechModeIfNeeded()
     }
 
     func updateSpeechModeDetail() {
@@ -45,10 +45,11 @@ extension SettingsWindowController {
 
     func selectedSpeechMode() -> SpeechMode {
         let index = speechModePopUp.indexOfSelectedItem
-        guard SpeechMode.allCases.indices.contains(index) else {
+        let presets = currentSpeechModePresets()
+        guard presets.indices.contains(index) else {
             return .englishToChinese
         }
-        return SpeechMode.allCases[index]
+        return presets[index]
     }
 
     func selectedSourceCode() -> String {
@@ -89,14 +90,30 @@ extension SettingsWindowController {
         targetLanguagePopUp.selectItem(at: index)
     }
 
-    /// 火山下：源/目标命中某个预设时同步勾选翻译预设。
+    func reloadSpeechModePopUp(selectedMode: SpeechMode? = nil) {
+        let presets = currentSpeechModePresets()
+        speechModePopUp.removeAllItems()
+        speechModePopUp.addItems(withTitles: presets.map(\.title))
+
+        let modeToSelect = selectedMode ?? .englishToChinese
+        let selectedIndex = presets.firstIndex(of: modeToSelect) ?? 0
+        speechModePopUp.selectItem(at: selectedIndex)
+        speechModePopUp.isEnabled = presets.isEmpty == false
+    }
+
+    func currentSpeechModePresets() -> [SpeechMode] {
+        SpeechMode.presets(for: selectedProvider())
+    }
+
+    /// 源/目标命中当前服务商的某个预设时同步勾选翻译预设。
     func selectMatchingSpeechModeIfNeeded() {
-        guard selectedProvider() == .volcengine else { return }
         let configuration = selectedSpeechConfiguration()
-        if let mode = SpeechMode.allCases.first(where: { mode in
-            mode.configuration.sourceCode == configuration.sourceCode &&
-                mode.configuration.targetCode == configuration.targetCode
-        }), let index = SpeechMode.allCases.firstIndex(of: mode) {
+        let presets = currentSpeechModePresets()
+        if let mode = presets.first(where: { mode in
+            let presetConfiguration = mode.configuration(for: configuration.provider)
+            return presetConfiguration.sourceCode == configuration.sourceCode &&
+                presetConfiguration.targetCode == configuration.targetCode
+        }), let index = presets.firstIndex(of: mode) {
             speechModePopUp.selectItem(at: index)
         }
     }

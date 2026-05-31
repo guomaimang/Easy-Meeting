@@ -6,7 +6,7 @@ extension SettingsWindowController {
         guard let text = NSPasteboard.general.string(forType: .string) else { return }
         setAPIKey(text.trimmingCharacters(in: .whitespacesAndNewlines))
         activeAPIKeyField().selectText(nil)
-        statusLabel.stringValue = "已从剪贴板粘贴 API Key"
+        autosave(successStatus: "已从剪贴板粘贴 API Key")
     }
 
     @objc func toggleAPIKeyVisibility() {
@@ -19,7 +19,7 @@ extension SettingsWindowController {
     @objc func clearAPIKey() {
         setAPIKey("")
         activeAPIKeyField().selectText(nil)
-        statusLabel.stringValue = "已清空 API Key"
+        autosave(successStatus: "已清空 API Key")
     }
 
     func controlTextDidChange(_ obj: Notification) {
@@ -28,6 +28,15 @@ extension SettingsWindowController {
             return
         }
         setAPIKey(textField.stringValue)
+    }
+
+    /// 文本框失去焦点或回车时落盘（API Key、区域 Region）。
+    func controlTextDidEndEditing(_ obj: Notification) {
+        guard let textField = obj.object as? NSTextField,
+              textField === apiKeyField || textField === apiKeyVisibleField || textField === regionField else {
+            return
+        }
+        autosave()
     }
 
     func setupAPIKeyControls() {

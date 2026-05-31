@@ -24,7 +24,7 @@ final class StatusBarController: NSObject {
         self.meetingSessionController = meetingSessionController
         self.settingsStore = settingsStore
         self.settingsWindowController = settingsWindowController
-        self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        self.statusItem = NSStatusBar.system.statusItem(withLength: 34)
         super.init()
         overlayController.onToggleRecording = { [weak self] in
             self?.toggleRecording()
@@ -91,10 +91,15 @@ final class StatusBarController: NSObject {
     }
 
     @objc private func toggleRecording() {
-        if meetingSessionController.isRecording {
-            stopRecording()
-        } else {
+        switch meetingSessionController.recordingState {
+        case .idle:
             startRecording()
+        case .recording:
+            stopRecording()
+        case .starting:
+            overlayController.showStatus(source: "正在启动录音", translation: "请稍候，当前启动流程完成后即可停止。")
+        case .stopping:
+            overlayController.showStatus(source: "正在停止录音", translation: "请稍候，保存完成后即可再次开始。")
         }
     }
 
@@ -104,14 +109,14 @@ final class StatusBarController: NSObject {
             return
         }
         var settings = settingsStore.settings
-        // 翻译预设是火山快捷填充，选择时切回火山服务商
-        settings.speechProvider = .volcengine
+        let provider = settings.speechProvider
+        let configuration = mode.configuration(for: provider)
         settings.speechMode = mode
-        settings.speechSourceLanguage = mode.configuration.sourceCode
-        settings.speechTargetLanguage = mode.configuration.targetCode
+        settings.speechSourceLanguage = configuration.sourceCode
+        settings.speechTargetLanguage = configuration.targetCode
         do {
             try settingsStore.save(settings)
-            overlayController.showStatus(source: "已切换翻译模式", translation: "\(mode.title)：\(mode.detail)")
+            overlayController.showStatus(source: "已切换翻译模式", translation: "\(mode.title)：\(configuration.detail)")
         } catch {
             overlayController.showStatus(source: "翻译模式保存失败", translation: error.localizedDescription)
         }
@@ -128,13 +133,16 @@ final class StatusBarController: NSObject {
     }
 
     private func setupStatusItem() {
-        statusItem.button?.title = "Easy Meeting"
+        statusItem.button?.title = "EM"
         statusItem.button?.toolTip = "Easy Meeting 会议助手"
+        statusItem.button?.font = .systemFont(ofSize: 13, weight: .semibold)
+        statusItem.button?.isEnabled = true
+        NSLog("菜单栏状态项已创建：EM")
         rebuildMenu()
     }
 
     private func rebuildMenu() {
-        overlayController.setRecording(meetingSessionController.isRecording)
+        overlayController.setRecording(meetingSessionController.recordingState.isRecordingVisible)
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "设置", action: #selector(openSettings), keyEquivalent: ","))
         menu.addItem(NSMenuItem.separator())
@@ -188,36 +196,33 @@ final class StatusBarController: NSObject {
     }
 
     private func recordingMenuItem() -> NSMenuItem {
-        let title = meetingSessionController.isRecording ? "停止录音" : "开始录音"
-        return NSMenuItem(title: title, action: #selector(toggleRecording), keyEquivalent: "r")
+        let item: NSMenuItem
+        switch meetingSessionController.recordingState {
+        case .idle:
+            item = NSMenuItem(title: "开始录音", action: #selector(toggleRecording), keyEquivalent: "r")
+        case .starting:
+            item = NSMenuItem(title: "正在启动录音…", action: #selector(toggleRecording), keyEquivalent: "r")
+        case .recording:
+            item = NSMenuItem(title: "停止录音", action: #selector(toggleRecording), keyEquivalent: "r")
+        case .stopping:
+            item = NSMenuItem(title: "正在停止录音…", action: #selector(toggleRecording), keyEquivalent: "r")
+        }
+        return item
     }
 
     private func speechModeMenuItem() -> NSMenuItem {
         let settings = settingsStore.settings
-        // Azure 语种代号体系与火山不同，不复用火山预设；菜单显示当前语种对并引导去设置
-        guard settings.speechProvider == .volcengine else {
-            let configuration = settings.speechConfiguration
-            let item = NSMenuItem(title: "翻译语种", action: nil, keyEquivalent: "")
-            let submenu = NSMenu()
-            let current = NSMenuItem(title: "当前：\(configuration.title)", action: nil, keyEquivalent: "")
-            current.isEnabled = false
-            submenu.addItem(current)
-            submenu.addItem(NSMenuItem.separator())
-            submenu.addItem(NSMenuItem(title: "在设置中修改…", action: #selector(openSettings), keyEquivalent: ""))
-            submenu.items.forEach { $0.target = self }
-            item.submenu = submenu
-            return item
-        }
-
         let item = NSMenuItem(title: "翻译模式", action: nil, keyEquivalent: "")
         let submenu = NSMenu()
+        let presets = SpeechMode.presets(for: settings.speechProvider)
 
-        SpeechMode.allCases.forEach { mode in
+        presets.forEach { mode in
             let modeItem = NSMenuItem(title: mode.title, action: #selector(selectSpeechMode), keyEquivalent: "")
             modeItem.representedObject = mode.rawValue
             let configuration = settings.speechConfiguration
-            modeItem.state = mode.configuration.sourceCode == configuration.sourceCode &&
-                mode.configuration.targetCode == configuration.targetCode ? .on : .off
+            let presetConfiguration = mode.configuration(for: settings.speechProvider)
+            modeItem.state = presetConfiguration.sourceCode == configuration.sourceCode &&
+                presetConfiguration.targetCode == configuration.targetCode ? .on : .off
             submenu.addItem(modeItem)
         }
 

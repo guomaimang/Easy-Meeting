@@ -21,7 +21,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     let pasteAPIKeyButton = NSButton(title: "粘贴", target: nil, action: nil)
     let revealAPIKeyButton = NSButton(title: "显示", target: nil, action: nil)
     let clearAPIKeyButton = NSButton(title: "清空", target: nil, action: nil)
-    let opacitySlider = NSSlider(value: 0.82, minValue: 0.25, maxValue: 1, target: nil, action: nil)
+    let opacitySlider = NSSlider(value: 0.82, minValue: 0.1, maxValue: 1, target: nil, action: nil)
     let opacityValueLabel = NSTextField(labelWithString: "")
     let fontSizeSlider = NSSlider(value: 22, minValue: 14, maxValue: 34, target: nil, action: nil)
     let fontSizeValueLabel = NSTextField(labelWithString: "")
@@ -78,31 +78,26 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         super.mouseDown(with: event)
     }
 
-    @objc private func save() {
-        do {
-            guard validateSpeechLanguages() else { return }
-            let settings = currentSettings()
-            try settingsStore.save(settings)
-            overlayController.setOpacity(CGFloat(settings.overlayOpacity))
-            overlayController.setFontSize(CGFloat(settings.overlayFontSize))
-            helperStatusField.stringValue = currentDiagnostic(for: settings)
-            statusLabel.stringValue = "已保存"
-        } catch {
-            statusLabel.stringValue = error.localizedDescription
-        }
+    @objc func checkConfiguration() {
+        autosave(successStatus: "已检查")
     }
 
-    @objc func checkConfiguration() {
+    /// 实时自动保存当前 UI 状态。语种组合非法时不写入。
+    /// - Parameter successStatus: 保存成功后在状态行显示的文案。
+    @discardableResult
+    func autosave(successStatus: String = "已保存") -> Bool {
         do {
-            guard validateSpeechLanguages() else { return }
+            guard validateSpeechLanguages() else { return false }
             let settings = currentSettings()
             try settingsStore.save(settings)
             overlayController.setOpacity(CGFloat(settings.overlayOpacity))
             overlayController.setFontSize(CGFloat(settings.overlayFontSize))
             helperStatusField.stringValue = currentDiagnostic(for: settings)
-            statusLabel.stringValue = "已检查"
+            statusLabel.stringValue = successStatus
+            return true
         } catch {
             statusLabel.stringValue = error.localizedDescription
+            return false
         }
     }
 
@@ -125,6 +120,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         )
         updateSpeechModeDetail()
         renderSelectedSection()
+        autosave()
     }
 
     @objc func selectSection(_ sender: NSControl) {
@@ -145,11 +141,23 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     @objc private func changeOpacity() {
         updateOpacityLabel()
         overlayController.setOpacity(CGFloat(opacitySlider.doubleValue))
+        // 拖动中只实时预览，松手或键盘调整才写入持久化，避免高频写 Keychain
+        if shouldPersistSliderChange() {
+            autosave()
+        }
     }
 
     @objc func changeFontSize() {
         updateFontSizeLabel()
         overlayController.setFontSize(CGFloat(fontSizeSlider.doubleValue))
+        if shouldPersistSliderChange() {
+            autosave()
+        }
+    }
+
+    /// 连续滑块只在非拖动中（松手、键盘、点击轨道）时落盘。
+    private func shouldPersistSliderChange() -> Bool {
+        NSApp.currentEvent?.type != .leftMouseDragged
     }
 
     @objc func requestMicrophonePermission() {
@@ -184,18 +192,13 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         contentContainer.wantsLayer = true
         contentView.addSubview(contentContainer)
 
-        statusLabel.frame = NSRect(x: 228, y: 36, width: 360, height: 24)
+        statusLabel.frame = NSRect(x: 228, y: 36, width: 576, height: 24)
         statusLabel.textColor = .secondaryLabelColor
         contentView.addSubview(statusLabel)
-
-        let saveButton = NSButton(title: "保存", target: self, action: #selector(save))
-        saveButton.frame = NSRect(x: 724, y: 32, width: 80, height: 30)
-        contentView.addSubview(saveButton)
 
         providerPopUp.addItems(withTitles: SpeechProvider.allCases.map(\.title))
         providerPopUp.target = self
         providerPopUp.action = #selector(changeProvider)
-        speechModePopUp.addItems(withTitles: SpeechMode.allCases.map(\.title))
         speechModePopUp.target = self
         speechModePopUp.action = #selector(changeSpeechMode)
         // 源/目标语种下拉框按当前 provider 在 loadSettings/changeProvider 里动态填充
@@ -223,9 +226,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         if let index = SpeechProvider.allCases.firstIndex(of: settings.speechProvider) {
             providerPopUp.selectItem(at: index)
         }
-        if let index = SpeechMode.allCases.firstIndex(of: settings.speechMode) {
-            speechModePopUp.selectItem(at: index)
-        }
+        reloadSpeechModePopUp(selectedMode: settings.speechMode)
         reloadLanguagePopUps(sourceCode: settings.speechSourceLanguage, targetCode: settings.speechTargetLanguage)
         volcengineKeyDraft = settings.volcengineAPIKey
         azureKeyDraft = settings.azureSpeechKey

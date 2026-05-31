@@ -30,7 +30,9 @@ final class AppSettingsStore {
         let targetLanguage = SpeechLanguageCatalog.validatedTargetCode(targetRawValue, for: provider)
         let apiKey = KeychainStore.read(account: Keys.volcengineAPIKey)
         let azureSpeechKey = KeychainStore.read(account: Keys.azureSpeechKey)
-        let azureSpeechRegion = defaults.string(forKey: Keys.azureSpeechRegion) ?? fallback.azureSpeechRegion
+        let azureSpeechRegion = Self.normalizedAzureSpeechRegion(
+            defaults.string(forKey: Keys.azureSpeechRegion) ?? fallback.azureSpeechRegion
+        )
         let overlayOpacity = defaults.object(forKey: Keys.overlayOpacity) as? Double ?? fallback.overlayOpacity
         let overlayFontSize = defaults.object(forKey: Keys.overlayFontSize) as? Double ?? fallback.overlayFontSize
 
@@ -48,11 +50,12 @@ final class AppSettingsStore {
     }
 
     func save(_ settings: AppSettings) throws {
+        let azureSpeechRegion = Self.normalizedAzureSpeechRegion(settings.azureSpeechRegion)
         defaults.set(settings.speechProvider.rawValue, forKey: Keys.speechProvider)
         defaults.set(settings.speechMode.rawValue, forKey: Keys.speechMode)
         defaults.set(settings.speechSourceLanguage, forKey: Keys.speechSourceLanguage)
         defaults.set(settings.speechTargetLanguage, forKey: Keys.speechTargetLanguage)
-        defaults.set(settings.azureSpeechRegion, forKey: Keys.azureSpeechRegion)
+        defaults.set(azureSpeechRegion, forKey: Keys.azureSpeechRegion)
         defaults.set(Self.clampedOpacity(settings.overlayOpacity), forKey: Keys.overlayOpacity)
         defaults.set(Self.clampedFontSize(settings.overlayFontSize), forKey: Keys.overlayFontSize)
         try KeychainStore.write(settings.volcengineAPIKey, account: Keys.volcengineAPIKey)
@@ -64,7 +67,7 @@ final class AppSettingsStore {
             speechTargetLanguage: settings.speechTargetLanguage,
             volcengineAPIKey: settings.volcengineAPIKey,
             azureSpeechKey: settings.azureSpeechKey,
-            azureSpeechRegion: settings.azureSpeechRegion,
+            azureSpeechRegion: azureSpeechRegion,
             overlayOpacity: Self.clampedOpacity(settings.overlayOpacity),
             overlayFontSize: Self.clampedFontSize(settings.overlayFontSize)
         )
@@ -77,10 +80,15 @@ final class AppSettingsStore {
     }
 
     private static func clampedOpacity(_ opacity: Double) -> Double {
-        min(max(opacity, 0.25), 1)
+        min(max(opacity, 0.1), 1)
     }
 
     private static func clampedFontSize(_ fontSize: Double) -> Double {
         min(max(fontSize, 14), 34)
+    }
+
+    private static func normalizedAzureSpeechRegion(_ region: String) -> String {
+        let trimmed = region.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? AppSettings.defaults.azureSpeechRegion : trimmed
     }
 }

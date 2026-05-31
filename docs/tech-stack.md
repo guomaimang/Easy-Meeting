@@ -41,7 +41,7 @@ Easy Meeting 是一个完整的 macOS 本地会议助手产品。
 
 - 与火山 S2T 平级的另一条流式翻译链路，源语种 → 目标语种。
 - 通过 Node helper 子进程调用 Azure Speech SDK，协议与火山 helper 一致。
-- 需要 Speech Key 和 Region 两个凭据，详见 `docs/azure-speech.md`。
+- 需要 Speech Key；Region 默认预设为 `eastasia`，仍可在设置页调整，详见 `docs/azure-speech.md`。
 
 AST 协议编解码与 Azure SDK 字段只允许出现在各自的 helper 基础设施层，
 方便未来替换服务商。

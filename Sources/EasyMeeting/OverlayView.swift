@@ -64,12 +64,14 @@ final class OverlayView: NSView {
         sourceLabel.stringValue = source
         translationLabel.stringValue = translation
         needsLayout = true
-        layoutSubtreeIfNeeded()
-        if sourceShouldFollow {
-            sourceScrollView.scrollToBottom()
-        }
-        if translationShouldFollow {
-            translationScrollView.scrollToBottom()
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            if sourceShouldFollow {
+                sourceScrollView.scrollToBottom()
+            }
+            if translationShouldFollow {
+                translationScrollView.scrollToBottom()
+            }
         }
     }
 
@@ -131,7 +133,7 @@ final class OverlayView: NSView {
         let viewport = bounds.insetBy(dx: inset, dy: inset)
 
         // 录音按钮固定在左上角内边距区域，避开字幕文字。
-        let buttonSize: CGFloat = 14
+        let buttonSize: CGFloat = 24
         recordButton.frame = NSRect(x: inset / 2, y: inset / 2, width: buttonSize, height: buttonSize)
 
         let columnWidth = max((viewport.width - gap) / 2, 120)

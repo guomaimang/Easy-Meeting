@@ -76,7 +76,15 @@ final class AudioRecorder: NSObject {
         isRecording = false
         let writerBox = writer.map(AssetWriterBox.init)
         let writerInput = writerInput
+        let didWriteAudio = didStartWriting
         stopCaptureOnly()
+
+        guard didWriteAudio else {
+            writerBox?.writer.cancelWriting()
+            NSLog("录音停止：尚未收到音频帧，跳过音频文件收尾。")
+            completion(.success(()))
+            return
+        }
 
         writerInput?.markAsFinished()
         writerBox?.writer.finishWriting {

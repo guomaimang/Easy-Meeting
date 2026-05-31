@@ -31,7 +31,8 @@ Azure 语音翻译只能通过官方 Speech SDK，没有 REST 接口；且官方
 Azure 需要两个凭据，与火山只需一个 API Key 不同：
 
 - `Speech Key`：语音服务密钥，保存到 Keychain。
-- `Region`：服务区域，如 `eastasia`、`southeastasia`、`eastus`，保存到 UserDefaults。
+- `Region`：服务区域，默认预设为 `eastasia`，保存到 UserDefaults。
+  用户通常只需要填写 `Speech Key`；如果历史配置或输入框为空，运行时仍使用 `eastasia`。
 
 设置页在选择 Azure 服务时显示这两个字段，替换火山的 Resource ID 行。
 
@@ -95,6 +96,14 @@ Azure 的源和目标是两套**不同**的代号体系：
 当前为会议常用精选（约 18 种），数据来源：
 https://learn.microsoft.com/azure/ai-services/speech-service/language-support
 
+Azure 设置页和菜单栏的翻译预设只提供三项：
+
+| 预设 | 源语种 | 目标语种 |
+|---|---|---|
+| 英文转中文 | `en-US` | `zh-Hans` |
+| 中文转英文 | `zh-CN` | `en` |
+| 粤语转中文 | `yue-CN` | `zh-Hans` |
+
 相关文件：
 
 - `Speech/Languages/SpeechLanguageOption.swift`：语言选项（代号 + 显示名）。
@@ -136,7 +145,8 @@ https://learn.microsoft.com/azure/ai-services/speech-service/language-support
 - 打包：`scripts/package-app.sh` 把 `index.js`、`azureTranslation.js`、
   `package.json`、`node_modules` 复制到 `Contents/Helpers/AzureSpeechHelper/`。
 - helper 定位优先级：bundle 内 `Contents/Helpers/AzureSpeechHelper/index.js`，
-  其次可执行目录同级，最后源码目录 `Helpers/AzureSpeechHelper/index.js`。
+  其次可执行目录同级，最后从可执行目录和当前工作目录逐级向上查找
+  `Helpers/AzureSpeechHelper/index.js`。这样 Xcode/SwiftPM 开发运行时不依赖当前目录必须是仓库根目录。
 
 ## 待办
 

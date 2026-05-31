@@ -20,7 +20,7 @@ final class OverlayWindowController: NSWindowController {
     }
 
     init(settings: AppSettings = .defaults) {
-        currentOpacity = CGFloat(min(max(settings.overlayOpacity, 0.25), 1))
+        currentOpacity = CGFloat(min(max(settings.overlayOpacity, 0.1), 1))
 
         let screenFrame = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
         let initialSize = Layout.defaultSize
@@ -89,7 +89,7 @@ final class OverlayWindowController: NSWindowController {
     }
 
     func setOpacity(_ opacity: CGFloat) {
-        currentOpacity = min(max(opacity, 0.25), 1)
+        currentOpacity = min(max(opacity, 0.1), 1)
         overlayView.opacity = currentOpacity
         overlayView.needsDisplay = true
     }

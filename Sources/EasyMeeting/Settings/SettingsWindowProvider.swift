@@ -5,6 +5,7 @@ extension SettingsWindowController {
     /// 汇总当前 UI 状态为 AppSettings。
     func currentSettings() -> AppSettings {
         syncCurrentProviderKeyDraft()
+        let azureSpeechRegion = regionField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         return AppSettings(
             speechProvider: selectedProvider(),
             speechMode: selectedSpeechMode(),
@@ -12,7 +13,7 @@ extension SettingsWindowController {
             speechTargetLanguage: selectedTargetCode(),
             volcengineAPIKey: volcengineKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines),
             azureSpeechKey: azureKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines),
-            azureSpeechRegion: regionField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines),
+            azureSpeechRegion: azureSpeechRegion.isEmpty ? AppSettings.defaults.azureSpeechRegion : azureSpeechRegion,
             overlayOpacity: opacitySlider.doubleValue,
             overlayFontSize: fontSizeSlider.doubleValue
         )

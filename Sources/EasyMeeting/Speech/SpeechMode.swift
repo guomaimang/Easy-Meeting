@@ -9,6 +9,15 @@ enum SpeechMode: String, CaseIterable {
     case japaneseToChinese = "japanese_to_chinese"
     case koreanToChinese = "korean_to_chinese"
 
+    static func presets(for provider: SpeechProvider) -> [SpeechMode] {
+        switch provider {
+        case .volcengine:
+            allCases
+        case .azure:
+            [.englishToChinese, .chineseToEnglish, .cantoneseToChinese]
+        }
+    }
+
     var title: String {
         switch self {
         case .englishToChinese:
@@ -68,5 +77,25 @@ enum SpeechMode: String, CaseIterable {
             sourceCode: sourceLanguage,
             targetCode: targetLanguage
         )
+    }
+
+    func configuration(for provider: SpeechProvider) -> SpeechTranslationConfiguration {
+        switch provider {
+        case .volcengine:
+            configuration
+        case .azure:
+            azureConfiguration
+        }
+    }
+
+    private var azureConfiguration: SpeechTranslationConfiguration {
+        switch self {
+        case .chineseToEnglish:
+            SpeechTranslationConfiguration(provider: .azure, sourceCode: "zh-CN", targetCode: "en")
+        case .cantoneseToChinese:
+            SpeechTranslationConfiguration(provider: .azure, sourceCode: "yue-CN", targetCode: "zh-Hans")
+        case .englishToChinese, .shanghaineseToChinese, .chineseEnglishBidirectional, .japaneseToChinese, .koreanToChinese:
+            SpeechTranslationConfiguration(provider: .azure, sourceCode: "en-US", targetCode: "zh-Hans")
+        }
     }
 }

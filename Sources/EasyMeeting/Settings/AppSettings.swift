@@ -20,10 +20,15 @@ struct AppSettings {
         speechTargetLanguage: "zh",
         volcengineAPIKey: "",
         azureSpeechKey: "",
-        azureSpeechRegion: "",
+        azureSpeechRegion: "eastasia",
         overlayOpacity: 0.82,
         overlayFontSize: 22
     )
+
+    var effectiveAzureSpeechRegion: String {
+        let region = azureSpeechRegion.trimmingCharacters(in: .whitespacesAndNewlines)
+        return region.isEmpty ? Self.defaults.azureSpeechRegion : region
+    }
 
     var speechConfiguration: SpeechTranslationConfiguration {
         SpeechTranslationConfiguration(
