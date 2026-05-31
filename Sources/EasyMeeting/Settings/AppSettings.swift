@@ -1,15 +1,15 @@
 import Foundation
 
 struct AppSettings {
+    static let volcengineResourceID = "volc.service_type.10053"
+
     var speechProvider: SpeechProvider
-    var volcengineResourceID: String
-    var volcengineAppKey: String
-    var volcengineAccessKey: String
+    var volcengineAPIKey: String
+    var overlayOpacity: Double
 
     static let defaults = AppSettings(
         speechProvider: .volcengine,
-        volcengineResourceID: "volc.service_type.10053",
-        volcengineAppKey: "",
-        volcengineAccessKey: ""
+        volcengineAPIKey: "",
+        overlayOpacity: 0.82
     )
 }

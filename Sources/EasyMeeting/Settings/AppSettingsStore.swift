@@ -4,9 +4,8 @@ import Foundation
 final class AppSettingsStore {
     private enum Keys {
         static let speechProvider = "speechProvider"
-        static let volcengineResourceID = "volcengineResourceID"
-        static let volcengineAppKey = "volcengineAppKey"
-        static let volcengineAccessKey = "volcengineAccessKey"
+        static let volcengineAPIKey = "volcengineAPIKey"
+        static let overlayOpacity = "overlayOpacity"
     }
 
     private let defaults = UserDefaults.standard
@@ -16,23 +15,34 @@ final class AppSettingsStore {
         let fallback = AppSettings.defaults
         let providerRawValue = defaults.string(forKey: Keys.speechProvider) ?? fallback.speechProvider.rawValue
         let provider = SpeechProvider(rawValue: providerRawValue) ?? fallback.speechProvider
-        let resourceID = defaults.string(forKey: Keys.volcengineResourceID) ?? fallback.volcengineResourceID
-        let appKey = KeychainStore.read(account: Keys.volcengineAppKey)
-        let accessKey = KeychainStore.read(account: Keys.volcengineAccessKey)
+        let apiKey = KeychainStore.read(account: Keys.volcengineAPIKey)
+        let overlayOpacity = defaults.object(forKey: Keys.overlayOpacity) as? Double ?? fallback.overlayOpacity
 
         settings = AppSettings(
             speechProvider: provider,
-            volcengineResourceID: resourceID,
-            volcengineAppKey: appKey,
-            volcengineAccessKey: accessKey
+            volcengineAPIKey: apiKey,
+            overlayOpacity: Self.clampedOpacity(overlayOpacity)
         )
     }
 
     func save(_ settings: AppSettings) throws {
         defaults.set(settings.speechProvider.rawValue, forKey: Keys.speechProvider)
-        defaults.set(settings.volcengineResourceID, forKey: Keys.volcengineResourceID)
-        try KeychainStore.write(settings.volcengineAppKey, account: Keys.volcengineAppKey)
-        try KeychainStore.write(settings.volcengineAccessKey, account: Keys.volcengineAccessKey)
-        self.settings = settings
+        defaults.set(Self.clampedOpacity(settings.overlayOpacity), forKey: Keys.overlayOpacity)
+        try KeychainStore.write(settings.volcengineAPIKey, account: Keys.volcengineAPIKey)
+        self.settings = AppSettings(
+            speechProvider: settings.speechProvider,
+            volcengineAPIKey: settings.volcengineAPIKey,
+            overlayOpacity: Self.clampedOpacity(settings.overlayOpacity)
+        )
+    }
+
+    func saveOverlayOpacity(_ opacity: Double) throws {
+        var updatedSettings = settings
+        updatedSettings.overlayOpacity = Self.clampedOpacity(opacity)
+        try save(updatedSettings)
+    }
+
+    private static func clampedOpacity(_ opacity: Double) -> Double {
+        min(max(opacity, 0.25), 1)
     }
 }

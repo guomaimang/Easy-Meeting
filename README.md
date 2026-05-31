@@ -68,6 +68,8 @@ zsh scripts/package-app.sh
 .build/debug/Easy Meeting.app
 ```
 
+启动后如果没有配置火山凭证，应用会自动打开设置窗口。应用同时会在 macOS 顶部菜单栏显示 `Easy Meeting` 入口，可从这里打开设置、开始录音、选择麦克风和查看最近会议。
+
 ## 数据目录
 
 会议数据保存在：
@@ -91,7 +93,8 @@ zsh scripts/package-app.sh
 
 - 设置窗口配置语音服务。
 - Keychain 保存 API Key。
-- 读取 Resource ID。
+- 固定使用 AST 2.0 Resource ID `volc.service_type.10053`。
+- 设置窗口可检查 API Key、固定 Resource ID 和本地 helper 状态。
 - 创建 AST WebSocket 连接。
 - 接收 WebSocket 消息和错误反馈。
 - 录音时把采集到的音频帧交给语音客户端。
@@ -102,7 +105,7 @@ zsh scripts/package-app.sh
 
 - 真实账号环境下验证音频格式、字幕事件时序和翻译质量。
 - 完整的字幕配对、断线重连、失败重试和错误分级。
-- 连接重试、错误分级、服务不可用时的用户可理解恢复路径。
+- 服务不可用时的恢复建议和诊断日志导出。
 
 火山同声传译 2.0 文档显示业务消息使用 protobuf。Easy Meeting 通过随 App 打包的 Go helper 复用官方 Go 示例客户端协议实现，Swift 主 App 只处理领域化字幕、状态和错误事件。
 

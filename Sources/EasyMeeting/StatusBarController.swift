@@ -7,6 +7,7 @@ final class StatusBarController: NSObject {
     private let audioDeviceManager: AudioDeviceManager
     private let meetingStore: MeetingStore
     private let meetingSessionController: MeetingSessionController
+    private let settingsStore: AppSettingsStore
     private let settingsWindowController: SettingsWindowController
 
     init(
@@ -14,12 +15,14 @@ final class StatusBarController: NSObject {
         audioDeviceManager: AudioDeviceManager,
         meetingStore: MeetingStore,
         meetingSessionController: MeetingSessionController,
+        settingsStore: AppSettingsStore,
         settingsWindowController: SettingsWindowController
     ) {
         self.overlayController = overlayController
         self.audioDeviceManager = audioDeviceManager
         self.meetingStore = meetingStore
         self.meetingSessionController = meetingSessionController
+        self.settingsStore = settingsStore
         self.settingsWindowController = settingsWindowController
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
@@ -35,15 +38,15 @@ final class StatusBarController: NSObject {
     }
 
     @objc private func setOpacityLow() {
-        overlayController.setOpacity(0.45)
+        saveOpacity(0.45)
     }
 
     @objc private func setOpacityMedium() {
-        overlayController.setOpacity(0.72)
+        saveOpacity(0.72)
     }
 
     @objc private func setOpacityHigh() {
-        overlayController.setOpacity(0.9)
+        saveOpacity(0.9)
     }
 
     @objc private func quit() {
@@ -114,13 +117,15 @@ final class StatusBarController: NSObject {
     }
 
     private func setupStatusItem() {
-        statusItem.button?.title = "EM"
-        statusItem.button?.toolTip = "Easy Meeting"
+        statusItem.button?.title = "Easy Meeting"
+        statusItem.button?.toolTip = "Easy Meeting 会议助手"
         rebuildMenu()
     }
 
     private func rebuildMenu() {
         let menu = NSMenu()
+        menu.addItem(NSMenuItem(title: "设置", action: #selector(openSettings), keyEquivalent: ","))
+        menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "显示悬浮窗", action: #selector(showOverlay), keyEquivalent: "s"))
         menu.addItem(NSMenuItem(title: "显示/隐藏悬浮窗", action: #selector(toggleOverlay), keyEquivalent: "h"))
         menu.addItem(NSMenuItem.separator())
@@ -133,8 +138,6 @@ final class StatusBarController: NSObject {
         menu.addItem(historyMenuItem())
         menu.addItem(NSMenuItem.separator())
         menu.addItem(opacityMenuItem())
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "设置", action: #selector(openSettings), keyEquivalent: ","))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "退出", action: #selector(quit), keyEquivalent: "q"))
         menu.items.forEach { $0.target = self }
@@ -251,6 +254,15 @@ final class StatusBarController: NSObject {
             self?.overlayController.showStatus(source: source, translation: translation)
         } onMenuUpdate: { [weak self] in
             self?.rebuildMenu()
+        }
+    }
+
+    private func saveOpacity(_ opacity: Double) {
+        overlayController.setOpacity(CGFloat(opacity))
+        do {
+            try settingsStore.saveOverlayOpacity(opacity)
+        } catch {
+            overlayController.showStatus(source: "透明度保存失败", translation: error.localizedDescription)
         }
     }
 }

@@ -2,8 +2,7 @@ package main
 
 type command struct {
 	Type                  string `json:"type"`
-	AppKey                string `json:"appKey,omitempty"`
-	AccessKey             string `json:"accessKey,omitempty"`
+	APIKey                string `json:"apiKey,omitempty"`
 	ResourceID            string `json:"resourceID,omitempty"`
 	Mode                  string `json:"mode,omitempty"`
 	SourceLanguage        string `json:"sourceLanguage,omitempty"`

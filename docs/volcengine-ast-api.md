@@ -30,7 +30,7 @@
 - `X-Api-Access-Key`：旧版 Access Token。
 - `X-Api-Resource-Id`：固定为 `volc.service_type.10053`。
 
-文档样例中还出现过 `X-Api-App-Key`，与新版表格字段不一致。实现时以控制台实际返回和联调结果为准，配置层需要避免把字段名写死在 UI。
+设置页只要求用户填写 `X-Api-Key` 对应的 API Key；`X-Api-Resource-Id` 在应用内固定为 `volc.service_type.10053`，不作为用户配置项。
 
 ## 语种
 
@@ -143,7 +143,6 @@
 
 ## 待验证
 
-- 新版鉴权字段到底使用 `X-Api-Key` 还是兼容 `X-Api-App-Key`。
 - Go 示例 proto 中字段命名和文档字段命名是否完全一致。
 - `format=wav` 但 `codec=raw` 时，`TaskRequest.data` 是否需要裸 PCM，还是需要 WAV 片段头。
 - 80ms 发包在 macOS `AVAudioEngine` 当前转换链路下的延迟和稳定性。

@@ -57,10 +57,8 @@ Easy Meeting 只需要 S2T，不需要服务端合成语音。
 
 具体参数以后端文档和控制台配置为准，客户端侧需要抽象出：
 
-- App Key。
-- Access Key。
-- Resource ID。
-- App ID 等可选服务标识。
+- API Key。
+- 固定 Resource ID：`volc.service_type.10053`。
 - 源语言。
 - 目标语言。
 - 翻译模式。
@@ -96,6 +94,7 @@ Easy Meeting 只需要 S2T，不需要服务端合成语音。
 - 音频采集出口统一为 PCM 16kHz、单声道、16bit，小端有符号整型。
 - Go helper 复用 `ref/_extracted/go/ast_go` 官方示例模块中的 AST proto 和协议依赖。
 - Swift 与 Go helper 通过 JSON Lines 通信，Swift 只接收领域化字幕、状态和错误事件。
+- 设置窗口可检查 API Key、固定 Resource ID 和本地 helper 是否可执行。
 - 仍需真实账号和会议语料验证事件时序、字幕配对和错误恢复。
 
 ## AST 参考客户端结论
@@ -104,8 +103,7 @@ Easy Meeting 只需要 S2T，不需要服务端合成语音。
 
 - 地址：`wss://openspeech.bytedance.com/api/v4/ast/v2/translate`。
 - WebSocket Header：
-  - `X-Api-App-Key`
-  - `X-Api-Access-Key`
+  - `X-Api-Key`
   - `X-Api-Resource-Id`
   - `X-Api-Connect-Id`
 - 上行业务消息为 `TranslateRequest` protobuf 二进制。
@@ -117,7 +115,7 @@ Easy Meeting 只需要 S2T，不需要服务端合成语音。
   4. 停止时发送 `FinishSession`
   5. 服务端返回字幕事件和 `SessionFinished`
 
-详细鉴权、事件码、语种约束、音频格式和错误码见 `docs/volcengine-ast-api.md`。本地文档记录了新版 `X-Api-Key` 与样例 `X-Api-App-Key` 的字段差异，真实接入时必须用控制台账号联调确认。
+详细鉴权、事件码、语种约束、音频格式和错误码见 `docs/volcengine-ast-api.md`。设置页只要求填写控制台 API Key，Resource ID 在应用内固定。
 
 ## Go helper 方案
 
@@ -126,7 +124,16 @@ Easy Meeting 只需要 S2T，不需要服务端合成语音。
 - helper 随 `.app` 打包到 `Contents/Helpers/easy-meeting-ast-helper`。
 - Swift 通过 stdin/stdout JSON Lines 向 helper 发送 `start`、`audio`、`finish`、`stop` 命令。
 - helper 向 Swift 返回 `status`、`subtitle`、`error` 事件。
+- 本地调试时 Swift 也会查找 `.build/debug/easy-meeting-ast-helper`。
 - 旧的 Swift 原生 AST 客户端路线已删除，不再维护 SwiftProtobuf 生成配置。
+
+### Swift 侧分层
+
+`Sources/EasyMeeting/Speech/Volcengine/` 按职责拆分为三个文件，避免单文件膨胀：
+
+- `VolcengineHelperSpeechClient.swift`：实现 `SpeechClient`，负责拉起 helper 进程、写入命令、按行解析 stdout、把领域事件回传上层。
+- `VolcengineHelperProtocol.swift`：定义 Swift 与 helper 间的 JSON 协议类型 `VolcengineHelperCommand`、`VolcengineHelperEvent` 和错误 `VolcengineHelperError`，是唯一描述线协议的地方。
+- `VolcengineHelperRuntime.swift`：负责定位 helper 可执行文件（bundle、可执行目录、`.build/debug`）和生成配置诊断文本，供设置窗口的“检查配置”复用。
 
 ## 音频管道设计
 

@@ -15,19 +15,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let audioRecorder = AudioRecorder()
         let meetingStore = MeetingStore()
         let settingsStore = AppSettingsStore()
-        let settingsWindowController = SettingsWindowController(settingsStore: settingsStore)
         let meetingSessionController = MeetingSessionController(
             audioDeviceManager: audioDeviceManager,
             audioRecorder: audioRecorder,
             meetingStore: meetingStore,
             settingsStore: settingsStore
         )
-        let overlayController = OverlayWindowController()
+        let overlayController = OverlayWindowController(initialOpacity: settingsStore.settings.overlayOpacity)
+        let settingsWindowController = SettingsWindowController(
+            settingsStore: settingsStore,
+            audioDeviceManager: audioDeviceManager,
+            overlayController: overlayController
+        )
         let statusBarController = StatusBarController(
             overlayController: overlayController,
             audioDeviceManager: audioDeviceManager,
             meetingStore: meetingStore,
             meetingSessionController: meetingSessionController,
+            settingsStore: settingsStore,
             settingsWindowController: settingsWindowController
         )
 
@@ -41,9 +46,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.statusBarController = statusBarController
 
         overlayController.show()
+        presentInitialConfigurationIfNeeded(
+            settingsStore: settingsStore,
+            settingsWindowController: settingsWindowController,
+            overlayController: overlayController
+        )
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
+    }
+
+    @MainActor
+    private func presentInitialConfigurationIfNeeded(
+        settingsStore: AppSettingsStore,
+        settingsWindowController: SettingsWindowController,
+        overlayController: OverlayWindowController
+    ) {
+        let diagnostic = VolcengineHelperRuntime.diagnostic(settings: settingsStore.settings)
+        guard diagnostic.hasPrefix("配置可用") == false else { return }
+
+        overlayController.showStatus(
+            source: "请先完成 Easy Meeting 设置",
+            translation: "顶部菜单栏点击 Easy Meeting，或在已打开的设置窗口填写火山配置。"
+        )
+        settingsWindowController.show()
     }
 }

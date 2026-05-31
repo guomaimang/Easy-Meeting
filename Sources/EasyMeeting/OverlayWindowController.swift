@@ -2,9 +2,11 @@ import AppKit
 
 final class OverlayWindowController: NSWindowController {
     private let overlayView = OverlayView()
-    private var currentOpacity: CGFloat = 0.82
+    private var currentOpacity: CGFloat
 
-    init() {
+    init(initialOpacity: Double = AppSettings.defaults.overlayOpacity) {
+        currentOpacity = CGFloat(min(max(initialOpacity, 0.25), 1))
+
         let screenFrame = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
         let initialSize = NSSize(width: 560, height: 116)
         let initialOrigin = NSPoint(

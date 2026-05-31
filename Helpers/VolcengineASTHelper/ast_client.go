@@ -188,8 +188,7 @@ func (c *astClient) subtitleEvent(resp *ast.TranslateResponse, source, translate
 
 func dial(cmd command, connID string) (*websocket.Conn, error) {
 	header := http.Header{
-		"X-Api-App-Key":     []string{cmd.AppKey},
-		"X-Api-Access-Key":  []string{cmd.AccessKey},
+		"X-Api-Key":         []string{cmd.APIKey},
 		"X-Api-Resource-Id": []string{cmd.ResourceID},
 		"X-Api-Connect-Id":  []string{connID},
 	}
