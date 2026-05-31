@@ -61,4 +61,11 @@ enum SpeechMode: String, CaseIterable {
     var detail: String {
         "\(sourceLanguage) → \(targetLanguage)"
     }
+
+    var configuration: SpeechTranslationConfiguration {
+        SpeechTranslationConfiguration(
+            sourceLanguage: SpeechLanguage(rawValue: sourceLanguage) ?? .en,
+            targetLanguage: SpeechLanguage(rawValue: targetLanguage) ?? .zh
+        )
+    }
 }

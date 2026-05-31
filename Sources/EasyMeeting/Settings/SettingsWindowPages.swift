@@ -26,20 +26,32 @@ extension SettingsWindowController {
 
     func speechPage() -> NSView {
         let page = pageView(title: "语音")
-        let serviceGroup = groupView(y: 314, height: 126)
+        let serviceGroup = groupView(y: 232, height: 208)
         page.addSubview(serviceGroup)
-        addRowTitle("语音服务", to: serviceGroup, y: 82)
-        providerPopUp.frame = NSRect(x: 244, y: 78, width: 250, height: 28)
+        addRowTitle("语音服务", to: serviceGroup, y: 166)
+        providerPopUp.frame = NSRect(x: 244, y: 162, width: 250, height: 28)
         serviceGroup.addSubview(providerPopUp)
-        addDivider(to: serviceGroup, y: 62)
+        addDivider(to: serviceGroup, y: 146)
 
-        addRowTitle("翻译模式", to: serviceGroup, y: 26)
-        speechModePopUp.frame = NSRect(x: 244, y: 22, width: 250, height: 28)
-        speechModeDetailLabel.frame = NSRect(x: 508, y: 26, width: 130, height: 22)
+        addRowTitle("翻译预设", to: serviceGroup, y: 120)
+        speechModePopUp.frame = NSRect(x: 244, y: 116, width: 250, height: 28)
+        speechModeDetailLabel.frame = NSRect(x: 508, y: 120, width: 132, height: 22)
         serviceGroup.addSubview(speechModePopUp)
         serviceGroup.addSubview(speechModeDetailLabel)
+        addDivider(to: serviceGroup, y: 100)
 
-        let keyGroup = groupView(y: 154, height: 144)
+        addRowTitle("源语种", to: serviceGroup, y: 74)
+        sourceLanguagePopUp.frame = NSRect(x: 244, y: 70, width: 250, height: 28)
+        serviceGroup.addSubview(sourceLanguagePopUp)
+        addDivider(to: serviceGroup, y: 54)
+
+        addRowTitle("目标语种", to: serviceGroup, y: 28)
+        targetLanguagePopUp.frame = NSRect(x: 244, y: 24, width: 250, height: 28)
+        serviceGroup.addSubview(targetLanguagePopUp)
+        speechLanguageWarningLabel.frame = NSRect(x: 244, y: 4, width: 390, height: 18)
+        serviceGroup.addSubview(speechLanguageWarningLabel)
+
+        let keyGroup = groupView(y: 72, height: 144)
         page.addSubview(keyGroup)
         addRowTitle("Resource ID", to: keyGroup, y: 102)
         resourceValueLabel.frame = NSRect(x: 244, y: 103, width: 350, height: 22)
@@ -61,7 +73,7 @@ extension SettingsWindowController {
         keyGroup.addSubview(clearAPIKeyButton)
         keyGroup.addSubview(apiKeyLengthLabel)
 
-        let helperGroup = groupView(y: 66, height: 72)
+        let helperGroup = groupView(y: -16, height: 72)
         page.addSubview(helperGroup)
         addRowTitle("本地 helper", to: helperGroup, y: 26)
         helperStatusField.frame = NSRect(x: 244, y: 27, width: 282, height: 22)
@@ -113,11 +125,13 @@ extension SettingsWindowController {
         return view
     }
 
-    func addRowTitle(_ title: String, to view: NSView, y: CGFloat) {
+    @discardableResult
+    func addRowTitle(_ title: String, to view: NSView, y: CGFloat) -> NSTextField {
         let label = NSTextField(labelWithString: title)
         label.font = .systemFont(ofSize: 14, weight: .semibold)
         label.frame = NSRect(x: 18, y: y, width: 180, height: 22)
         view.addSubview(label)
+        return label
     }
 
     func addDivider(to view: NSView, y: CGFloat) {

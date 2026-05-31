@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -25,7 +26,11 @@ type astClient struct {
 	sessionID      string
 	sourceLanguage string
 	targetLanguage string
-	latestSource   string
+	currentSource  string
+	currentTarget  string
+	sourceFinal    bool
+	targetFinal    bool
+	finalEmitted   bool
 }
 
 func newASTClient(out *output) *astClient {
@@ -59,6 +64,11 @@ func (c *astClient) start(cmd command) error {
 	if c.targetLanguage == "" {
 		c.targetLanguage = "zh"
 	}
+	c.currentSource = ""
+	c.currentTarget = ""
+	c.sourceFinal = false
+	c.targetFinal = false
+	c.finalEmitted = false
 
 	req := &ast.TranslateRequest{
 		RequestMeta: &rpcmeta.RequestMeta{SessionID: c.sessionID},
@@ -157,23 +167,47 @@ func (c *astClient) handleResponse(resp *ast.TranslateResponse) bool {
 	case event.Type_SessionFinished:
 		c.out.send(helperEvent{Type: "status", Message: "session_finished"})
 		return true
+	case event.Type_SourceSubtitleStart:
+		c.currentSource = ""
+		c.sourceFinal = false
+		c.finalEmitted = false
 	case event.Type_SourceSubtitleResponse, event.Type_SourceSubtitleEnd:
-		c.latestSource = resp.GetText()
-		c.out.send(c.subtitleEvent(resp, c.latestSource, "", false))
+		c.currentSource = mergeSubtitleText(c.currentSource, resp.GetText())
+		isFinal := false
+		if resp.GetEvent() == event.Type_SourceSubtitleEnd {
+			c.sourceFinal = true
+			isFinal = c.consumeFinalIfReady()
+		}
+		c.out.send(c.subtitleEvent(resp, c.currentSource, c.currentTarget, isFinal))
+	case event.Type_TranslationSubtitleStart:
+		c.currentTarget = ""
+		c.targetFinal = false
 	case event.Type_TranslationSubtitleResponse, event.Type_TranslationSubtitleEnd:
-		c.out.send(c.subtitleEvent(resp, c.latestSource, resp.GetText(), true))
+		c.currentTarget = mergeSubtitleText(c.currentTarget, resp.GetText())
+		isFinal := false
+		if resp.GetEvent() == event.Type_TranslationSubtitleEnd {
+			c.targetFinal = true
+			isFinal = c.consumeFinalIfReady()
+		}
+		c.out.send(c.subtitleEvent(resp, c.currentSource, c.currentTarget, isFinal))
 	case event.Type_UsageResponse:
 		c.out.logf("usage response: status=%d message=%q", resp.GetResponseMeta().GetStatusCode(), resp.GetResponseMeta().GetMessage())
 	}
 	return false
 }
 
-func (c *astClient) subtitleEvent(resp *ast.TranslateResponse, source, translated string, isTranslation bool) helperEvent {
-	isFinal := resp.GetEvent() == event.Type_SourceSubtitleEnd ||
-		resp.GetEvent() == event.Type_TranslationSubtitleEnd
-	if !isTranslation {
-		translated = ""
+func (c *astClient) consumeFinalIfReady() bool {
+	if c.finalEmitted || !c.targetFinal || strings.TrimSpace(c.currentTarget) == "" {
+		return false
 	}
+	if !c.sourceFinal && strings.TrimSpace(c.currentSource) == "" {
+		return false
+	}
+	c.finalEmitted = true
+	return true
+}
+
+func (c *astClient) subtitleEvent(resp *ast.TranslateResponse, source, translated string, isFinal bool) helperEvent {
 	return helperEvent{
 		Type:              "subtitle",
 		SourceText:        source,
@@ -182,8 +216,22 @@ func (c *astClient) subtitleEvent(resp *ast.TranslateResponse, source, translate
 		EndMilliseconds:   resp.GetEndTime(),
 		SourceLanguage:    c.sourceLanguage,
 		TargetLanguage:    c.targetLanguage,
+		IsInterim:         !isFinal,
 		IsFinal:           isFinal,
 	}
+}
+
+func mergeSubtitleText(current, incoming string) string {
+	if incoming == "" {
+		return current
+	}
+	if current == "" || strings.HasPrefix(incoming, current) {
+		return incoming
+	}
+	if strings.HasPrefix(current, incoming) {
+		return current
+	}
+	return current + incoming
 }
 
 func dial(cmd command, connID string) (*websocket.Conn, error) {

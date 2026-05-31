@@ -5,7 +5,7 @@ protocol SpeechClient: AnyObject, Sendable {
     var isRunning: Bool { get }
 
     func start(
-        mode: SpeechMode,
+        configuration: SpeechTranslationConfiguration,
         meetingID: UUID,
         onEvent: @escaping @MainActor (RealtimeSpeechEvent) -> Void
     )

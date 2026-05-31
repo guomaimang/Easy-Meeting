@@ -35,6 +35,7 @@ final class OverlayWindowController: NSWindowController {
         panel.hasShadow = true
         panel.level = .floating
         panel.ignoresMouseEvents = false
+        panel.sharingType = .none
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
@@ -45,6 +46,9 @@ final class OverlayWindowController: NSWindowController {
 
         overlayView.opacity = currentOpacity
         overlayView.fontSize = CGFloat(settings.overlayFontSize)
+        overlayView.onDrag = { [weak self] gesture in
+            self?.applyDrag(gesture)
+        }
         overlayView.update(
             source: "Waiting for microphone input",
             translation: "等待麦克风输入"
@@ -123,6 +127,61 @@ final class OverlayWindowController: NSWindowController {
         )
         window?.setFrame(clamped(NSRect(origin: origin, size: Layout.defaultSize)), display: true)
         show()
+    }
+
+    private func applyDrag(_ gesture: OverlayDragGesture) {
+        guard let window else { return }
+
+        let dx = gesture.currentLocation.x - gesture.startLocation.x
+        let dy = gesture.currentLocation.y - gesture.startLocation.y
+        let frame = gesture.resizeEdges.isEmpty
+            ? movedFrame(from: gesture.startFrame, dx: dx, dy: dy)
+            : resizedFrame(from: gesture.startFrame, dx: dx, dy: dy, edges: gesture.resizeEdges)
+        window.setFrame(clamped(frame), display: true)
+    }
+
+    private func movedFrame(from frame: NSRect, dx: CGFloat, dy: CGFloat) -> NSRect {
+        NSRect(
+            x: frame.origin.x + dx,
+            y: frame.origin.y + dy,
+            width: frame.width,
+            height: frame.height
+        )
+    }
+
+    private func resizedFrame(
+        from frame: NSRect,
+        dx: CGFloat,
+        dy: CGFloat,
+        edges: OverlayResizeEdges
+    ) -> NSRect {
+        var next = frame
+
+        if edges.contains(.left) {
+            next.origin.x = frame.origin.x + dx
+            next.size.width = frame.width - dx
+        } else if edges.contains(.right) {
+            next.size.width = frame.width + dx
+        }
+
+        if edges.contains(.bottom) {
+            next.origin.y = frame.origin.y + dy
+            next.size.height = frame.height - dy
+        } else if edges.contains(.top) {
+            next.size.height = frame.height + dy
+        }
+
+        next.size.width = min(max(next.width, Layout.minimumSize.width), Layout.maximumSize.width)
+        next.size.height = min(max(next.height, Layout.minimumSize.height), Layout.maximumSize.height)
+
+        if edges.contains(.left) {
+            next.origin.x = frame.maxX - next.width
+        }
+        if edges.contains(.bottom) {
+            next.origin.y = frame.maxY - next.height
+        }
+
+        return next
     }
 
     private func clamped(_ frame: NSRect) -> NSRect {

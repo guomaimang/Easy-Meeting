@@ -8,6 +8,7 @@ final class MeetingSessionController {
     private let settingsStore: AppSettingsStore
     private var speechClient: SpeechClient?
     private var subtitleDisplay = SubtitleDisplayBuffer()
+    private var lastStoredTranscriptKey: String?
 
     var speechMode: SpeechMode {
         settingsStore.settings.speechMode
@@ -31,6 +32,7 @@ final class MeetingSessionController {
 
     func start(onStatus: @escaping @MainActor (String, String) -> Void, onMenuUpdate: @escaping @MainActor () -> Void) {
         subtitleDisplay.reset()
+        lastStoredTranscriptKey = nil
         Task { @MainActor in
             do {
                 _ = await audioDeviceManager.requestPermission()
@@ -38,6 +40,7 @@ final class MeetingSessionController {
                     throw AudioRecordingError.permissionDenied
                 }
 
+                let configuration = settingsStore.settings.speechConfiguration
                 let mode = settingsStore.settings.speechMode
                 let meeting = try meetingStore.startMeeting(mode: mode)
                 let client = startSpeech(for: meeting, onStatus: onStatus)
@@ -52,7 +55,7 @@ final class MeetingSessionController {
                 }
                 onStatus(
                     "正在录音：\(audioDeviceManager.selectedDeviceName())",
-                    "\(mode.title)：音频保存到 \(meeting.audioURL.lastPathComponent)"
+                    "\(configuration.title)：音频保存到 \(meeting.audioURL.lastPathComponent)"
                 )
             } catch {
                 onStatus("录音启动失败", error.localizedDescription)
@@ -86,7 +89,7 @@ final class MeetingSessionController {
     ) -> SpeechClient {
         let client = SpeechClientFactory.make(settings: settingsStore.settings)
         speechClient = client
-        client.start(mode: settingsStore.settings.speechMode, meetingID: meeting.id) { [weak self] event in
+        client.start(configuration: settingsStore.settings.speechConfiguration, meetingID: meeting.id) { [weak self] event in
             guard let self else { return }
 
             guard event.sourceLanguage != "system" else {
@@ -100,6 +103,11 @@ final class MeetingSessionController {
             guard event.isFinal, event.translatedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
                 return
             }
+            let transcriptKey = Self.transcriptKey(for: event)
+            guard transcriptKey != lastStoredTranscriptKey else {
+                return
+            }
+            lastStoredTranscriptKey = transcriptKey
 
             do {
                 try meetingStore.addTranscriptSegment(from: event)
@@ -118,20 +126,35 @@ final class MeetingSessionController {
             onStatus("会议保存失败", error.localizedDescription)
         }
     }
+
+    private static func transcriptKey(for event: RealtimeSpeechEvent) -> String {
+        [
+            event.sourceText.normalizedSubtitleText,
+            event.translatedText.normalizedSubtitleText,
+            event.sourceLanguage,
+            event.targetLanguage
+        ].joined(separator: "\u{1F}")
+    }
 }
 
 private struct SubtitleDisplayBuffer {
-    private struct Line {
-        let source: String
-        let translation: String
+    private struct Line: Equatable {
+        var source: String
+        var translation: String
+
+        var isEmpty: Bool {
+            source.isEmpty && translation.isEmpty
+        }
     }
 
     private var committed: [Line] = []
     private var current: Line?
+    private var lastCommitted: Line?
 
     mutating func reset() {
         committed.removeAll(keepingCapacity: true)
         current = nil
+        lastCommitted = nil
     }
 
     mutating func apply(_ event: RealtimeSpeechEvent) -> (source: String, translation: String) {
@@ -147,8 +170,11 @@ private struct SubtitleDisplayBuffer {
             )
         }
 
-        if event.isFinal, let line = current, line.translation.isEmpty == false {
-            committed.append(line)
+        if event.isFinal, let line = current, line.isEmpty == false, line.translation.isEmpty == false {
+            if line != lastCommitted {
+                committed.append(line)
+                lastCommitted = line
+            }
             current = nil
         }
 
@@ -157,5 +183,14 @@ private struct SubtitleDisplayBuffer {
             visible.map(\.source).joined(separator: "\n"),
             visible.map(\.translation).joined(separator: "\n")
         )
+    }
+}
+
+private extension String {
+    var normalizedSubtitleText: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { $0.isEmpty == false }
+            .joined(separator: " ")
     }
 }

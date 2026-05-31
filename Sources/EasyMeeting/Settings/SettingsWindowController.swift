@@ -9,7 +9,10 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     let contentContainer = SettingsBackgroundView()
     let providerPopUp = NSPopUpButton()
     let speechModePopUp = NSPopUpButton()
+    let sourceLanguagePopUp = NSPopUpButton()
+    let targetLanguagePopUp = NSPopUpButton()
     let speechModeDetailLabel = NSTextField(labelWithString: "")
+    let speechLanguageWarningLabel = NSTextField(labelWithString: "")
     let resourceValueLabel = NSTextField(labelWithString: AppSettings.volcengineResourceID)
     let apiKeyField = NSSecureTextField()
     let apiKeyVisibleField = NSTextField()
@@ -25,7 +28,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     let microphoneStatusField = NSTextField(labelWithString: "")
     let audioDevicePopUp = NSPopUpButton()
     let statusLabel = NSTextField(labelWithString: "")
-    var sectionButtons: [SettingsSection: NSButton] = [:]
+    var sectionButtons: [SettingsSection: NSControl] = [:]
     var selectedSection: SettingsSection = .app
     var apiKeyVisible = false
 
@@ -70,6 +73,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
 
     @objc private func save() {
         do {
+            guard validateSpeechLanguages() else { return }
             let settings = currentSettings()
             try settingsStore.save(settings)
             overlayController.setOpacity(CGFloat(settings.overlayOpacity))
@@ -83,6 +87,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
 
     @objc func checkConfiguration() {
         do {
+            guard validateSpeechLanguages() else { return }
             let settings = currentSettings()
             try settingsStore.save(settings)
             overlayController.setOpacity(CGFloat(settings.overlayOpacity))
@@ -94,8 +99,14 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         }
     }
 
-    @objc private func selectSection(_ sender: NSButton) {
-        guard let section = SettingsSection(rawValue: sender.tag) else { return }
+    @objc func selectSection(_ sender: NSControl) {
+        let section: SettingsSection?
+        if let sidebarButton = sender as? SettingsSidebarButton {
+            section = sidebarButton.section
+        } else {
+            section = SettingsSection(rawValue: sender.tag)
+        }
+        guard let section else { return }
         selectedSection = section
         renderSelectedSection()
     }
@@ -103,10 +114,6 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     @objc private func changeOpacity() {
         updateOpacityLabel()
         overlayController.setOpacity(CGFloat(opacitySlider.doubleValue))
-    }
-
-    @objc func changeSpeechMode() {
-        updateSpeechModeDetail()
     }
 
     @objc func changeFontSize() {
@@ -140,21 +147,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         guard let contentView = window?.contentView else { return }
         contentView.wantsLayer = true
 
-        sidebarStack.orientation = .vertical
-        sidebarStack.spacing = 8
-        sidebarStack.alignment = .leading
-        sidebarStack.frame = NSRect(x: 20, y: 144, width: 172, height: 380)
-        contentView.addSubview(sidebarStack)
-
-        SettingsSection.allCases.forEach { section in
-            let button = NSButton(title: section.title, target: self, action: #selector(selectSection))
-            button.tag = section.rawValue
-            button.setButtonType(.pushOnPushOff)
-            button.bezelStyle = .rounded
-            button.frame.size = NSSize(width: 148, height: 34)
-            sidebarStack.addArrangedSubview(button)
-            sectionButtons[section] = button
-        }
+        setupSidebar(in: contentView)
 
         contentContainer.frame = NSRect(x: 220, y: 96, width: 660, height: 480)
         contentContainer.wantsLayer = true
@@ -172,7 +165,17 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         speechModePopUp.addItems(withTitles: SpeechMode.allCases.map(\.title))
         speechModePopUp.target = self
         speechModePopUp.action = #selector(changeSpeechMode)
+        sourceLanguagePopUp.addItems(withTitles: SpeechLanguage.sourceCases.map(\.menuTitle))
+        targetLanguagePopUp.addItems(withTitles: SpeechLanguage.targetCases.map(\.menuTitle))
+        sourceLanguagePopUp.target = self
+        targetLanguagePopUp.target = self
+        sourceLanguagePopUp.action = #selector(changeSpeechLanguage)
+        targetLanguagePopUp.action = #selector(changeSpeechLanguage)
         speechModeDetailLabel.textColor = .secondaryLabelColor
+        speechModeDetailLabel.lineBreakMode = .byTruncatingTail
+        speechLanguageWarningLabel.textColor = .systemRed
+        speechLanguageWarningLabel.lineBreakMode = .byWordWrapping
+        speechLanguageWarningLabel.maximumNumberOfLines = 2
         setupAPIKeyControls()
         opacitySlider.target = self
         opacitySlider.action = #selector(changeOpacity)
@@ -191,6 +194,8 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         if let index = SpeechMode.allCases.firstIndex(of: settings.speechMode) {
             speechModePopUp.selectItem(at: index)
         }
+        selectSourceLanguage(settings.speechSourceLanguage)
+        selectTargetLanguage(settings.speechTargetLanguage)
         setAPIKey(settings.volcengineAPIKey)
         opacitySlider.doubleValue = settings.overlayOpacity
         fontSizeSlider.doubleValue = settings.overlayFontSize
@@ -205,9 +210,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     }
 
     private func renderSelectedSection() {
-        sectionButtons.forEach { section, button in
-            button.state = section == selectedSection ? .on : .off
-        }
+        updateSidebarSelection()
         contentContainer.subviews.forEach { $0.removeFromSuperview() }
 
         let page: NSView
@@ -253,14 +256,12 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         fontSizeValueLabel.stringValue = "\(Int(fontSizeSlider.doubleValue)) pt"
     }
 
-    func updateSpeechModeDetail() {
-        speechModeDetailLabel.stringValue = selectedSpeechMode().detail
-    }
-
     private func currentSettings() -> AppSettings {
         AppSettings(
             speechProvider: selectedProvider(),
             speechMode: selectedSpeechMode(),
+            speechSourceLanguage: selectedSourceLanguage(),
+            speechTargetLanguage: selectedTargetLanguage(),
             volcengineAPIKey: currentAPIKey().trimmingCharacters(in: .whitespacesAndNewlines),
             overlayOpacity: opacitySlider.doubleValue,
             overlayFontSize: fontSizeSlider.doubleValue
@@ -273,14 +274,6 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
             return .volcengine
         }
         return SpeechProvider.allCases[index]
-    }
-
-    private func selectedSpeechMode() -> SpeechMode {
-        let index = speechModePopUp.indexOfSelectedItem
-        guard SpeechMode.allCases.indices.contains(index) else {
-            return .englishToChinese
-        }
-        return SpeechMode.allCases[index]
     }
 
 }

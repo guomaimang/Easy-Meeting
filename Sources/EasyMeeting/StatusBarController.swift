@@ -102,6 +102,8 @@ final class StatusBarController: NSObject {
         }
         var settings = settingsStore.settings
         settings.speechMode = mode
+        settings.speechSourceLanguage = mode.configuration.sourceLanguage
+        settings.speechTargetLanguage = mode.configuration.targetLanguage
         do {
             try settingsStore.save(settings)
             overlayController.showStatus(source: "已切换翻译模式", translation: "\(mode.title)：\(mode.detail)")
@@ -225,7 +227,9 @@ final class StatusBarController: NSObject {
         SpeechMode.allCases.forEach { mode in
             let modeItem = NSMenuItem(title: mode.title, action: #selector(selectSpeechMode), keyEquivalent: "")
             modeItem.representedObject = mode.rawValue
-            modeItem.state = mode == settingsStore.settings.speechMode ? .on : .off
+            let configuration = settingsStore.settings.speechConfiguration
+            modeItem.state = mode.configuration.sourceLanguage == configuration.sourceLanguage &&
+                mode.configuration.targetLanguage == configuration.targetLanguage ? .on : .off
             submenu.addItem(modeItem)
         }
 

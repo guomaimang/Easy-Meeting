@@ -76,5 +76,6 @@ struct VolcengineHelperEvent: Decodable {
     let endMilliseconds: Int?
     let sourceLanguage: String?
     let targetLanguage: String?
+    let isInterim: Bool?
     let isFinal: Bool?
 }

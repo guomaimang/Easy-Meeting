@@ -25,6 +25,7 @@ type helperEvent struct {
 	EndMilliseconds       int32  `json:"endMilliseconds,omitempty"`
 	SourceLanguage        string `json:"sourceLanguage,omitempty"`
 	TargetLanguage        string `json:"targetLanguage,omitempty"`
+	IsInterim             bool   `json:"isInterim,omitempty"`
 	IsFinal               bool   `json:"isFinal,omitempty"`
 	TimestampMilliseconds int    `json:"timestampMilliseconds,omitempty"`
 }

@@ -107,11 +107,14 @@
 ## 字幕事件边界
 
 - 只有 `SourceSubtitleResponse`、`SourceSubtitleEnd`、`TranslationSubtitleResponse` 和 `TranslationSubtitleEnd` 可以映射为字幕事件。
+- `SourceSubtitleResponse` 和 `TranslationSubtitleResponse` 是临时字幕，必须立即刷新当前行；对应的 `End` 事件才提交为历史分段。
+- 服务端 `text` 可能是完整临时文本，也可能是增量片段；helper 需要在同一字幕分段内合并文本，再向 Swift 输出当前完整行。
 - `UsageResponse` 只用于计量日志，不允许进入 UI 字幕、SQLite 转录或导出文件。
 - `SessionStarted`、`SessionFinished`、`AudioMuted` 等会话状态只允许作为系统状态提示，不允许写入会议转录。
 - helper 的 stderr 调试日志只进入开发诊断日志，不允许覆盖悬浮字幕。
 - UI 展示会话字幕历史；增量字幕更新当前行，最终字幕进入历史队列。
 - 悬浮窗字幕区支持滚轮翻阅历史；当用户停留在底部时自动跟随最新字幕，向上翻阅后暂停自动滚动，直到用户回到底部。
+- 悬浮窗支持鼠标拖动调整位置，并支持在边缘或角落拖拽调整尺寸；`Command+0` 只恢复悬浮窗位置和尺寸，不修改字幕字体大小。
 
 ## 响应字段
 

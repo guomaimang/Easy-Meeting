@@ -8,12 +8,16 @@ final class OverlayView: NSView {
             needsLayout = true
         }
     }
+    var onDrag: ((OverlayDragGesture) -> Void)?
 
     private let scrollView = OverlayScrollView()
     private let contentView = OverlayContentView()
     private let sourceLabel = NSTextField(wrappingLabelWithString: "")
     private let translationLabel = NSTextField(wrappingLabelWithString: "")
     private let separatorView = NSView()
+    private var dragStartLocation: NSPoint?
+    private var dragStartFrame: NSRect?
+    private var dragEdges: OverlayResizeEdges = []
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -29,6 +33,14 @@ final class OverlayView: NSView {
         true
     }
 
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        true
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        bounds.contains(point) ? self : nil
+    }
+
     func update(source: String, translation: String) {
         let shouldFollow = scrollView.isPinnedToBottom
         sourceLabel.stringValue = source
@@ -38,6 +50,38 @@ final class OverlayView: NSView {
         if shouldFollow {
             scrollView.scrollToBottom()
         }
+    }
+
+    override func scrollWheel(with event: NSEvent) {
+        scrollView.scrollWheel(with: event)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        guard let window else { return }
+        dragStartLocation = window.convertPoint(toScreen: event.locationInWindow)
+        dragStartFrame = window.frame
+        dragEdges = resizeEdges(at: convert(event.locationInWindow, from: nil))
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let window,
+              let dragStartLocation,
+              let dragStartFrame else {
+            return
+        }
+
+        onDrag?(OverlayDragGesture(
+            startFrame: dragStartFrame,
+            startLocation: dragStartLocation,
+            currentLocation: window.convertPoint(toScreen: event.locationInWindow),
+            resizeEdges: dragEdges
+        ))
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        dragStartLocation = nil
+        dragStartFrame = nil
+        dragEdges = []
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -100,9 +144,41 @@ final class OverlayView: NSView {
     }
 
     private func applyFonts() {
-        sourceLabel.font = .systemFont(ofSize: max(fontSize - 4, 12), weight: .regular)
-        translationLabel.font = .systemFont(ofSize: fontSize, weight: .semibold)
+        sourceLabel.font = .systemFont(ofSize: fontSize, weight: .regular)
+        translationLabel.font = .systemFont(ofSize: max(fontSize - 1, 13), weight: .semibold)
     }
+
+    private func resizeEdges(at point: NSPoint) -> OverlayResizeEdges {
+        let zone: CGFloat = 12
+        var edges: OverlayResizeEdges = []
+        if point.x <= zone {
+            edges.insert(.left)
+        } else if point.x >= bounds.width - zone {
+            edges.insert(.right)
+        }
+        if point.y <= zone {
+            edges.insert(.top)
+        } else if point.y >= bounds.height - zone {
+            edges.insert(.bottom)
+        }
+        return edges
+    }
+}
+
+struct OverlayResizeEdges: OptionSet {
+    let rawValue: Int
+
+    static let left = OverlayResizeEdges(rawValue: 1 << 0)
+    static let right = OverlayResizeEdges(rawValue: 1 << 1)
+    static let top = OverlayResizeEdges(rawValue: 1 << 2)
+    static let bottom = OverlayResizeEdges(rawValue: 1 << 3)
+}
+
+struct OverlayDragGesture {
+    let startFrame: NSRect
+    let startLocation: NSPoint
+    let currentLocation: NSPoint
+    let resizeEdges: OverlayResizeEdges
 }
 
 private final class OverlayScrollView: NSScrollView {

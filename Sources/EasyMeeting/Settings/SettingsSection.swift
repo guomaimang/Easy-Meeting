@@ -12,4 +12,24 @@ enum SettingsSection: Int, CaseIterable {
         case .microphone: "麦克风"
         }
     }
+
+    var groupTitle: String {
+        switch self {
+        case .app, .speech:
+            "通用"
+        case .microphone:
+            "输入"
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .app:
+            "slider.horizontal.3"
+        case .speech:
+            "waveform.and.mic"
+        case .microphone:
+            "mic"
+        }
+    }
 }

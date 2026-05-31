@@ -14,7 +14,7 @@ final class VolcengineHelperSpeechClient: SpeechClient, @unchecked Sendable {
     }
 
     func start(
-        mode: SpeechMode,
+        configuration: SpeechTranslationConfiguration,
         meetingID: UUID,
         onEvent: @escaping @MainActor (RealtimeSpeechEvent) -> Void
     ) {
@@ -35,9 +35,9 @@ final class VolcengineHelperSpeechClient: SpeechClient, @unchecked Sendable {
             try send(VolcengineHelperCommand.start(
                 apiKey: settings.volcengineAPIKey,
                 resourceID: AppSettings.volcengineResourceID,
-                mode: mode.rawValue,
-                sourceLanguage: mode.sourceLanguage,
-                targetLanguage: mode.targetLanguage,
+                mode: "s2t",
+                sourceLanguage: configuration.sourceLanguage.rawValue,
+                targetLanguage: configuration.targetLanguage.rawValue,
                 meetingID: meetingID.uuidString
             ))
             isRunning = true
@@ -157,6 +157,7 @@ final class VolcengineHelperSpeechClient: SpeechClient, @unchecked Sendable {
             endMilliseconds: event.endMilliseconds ?? 0,
             sourceLanguage: event.sourceLanguage ?? "auto",
             targetLanguage: event.targetLanguage ?? "zh",
+            isInterim: event.isInterim ?? false,
             isFinal: event.isFinal ?? false
         ))
     }
@@ -180,6 +181,7 @@ final class VolcengineHelperSpeechClient: SpeechClient, @unchecked Sendable {
             endMilliseconds: 0,
             sourceLanguage: "system",
             targetLanguage: "zh",
+            isInterim: false,
             isFinal: true
         ))
     }

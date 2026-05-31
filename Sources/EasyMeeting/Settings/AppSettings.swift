@@ -5,6 +5,8 @@ struct AppSettings {
 
     var speechProvider: SpeechProvider
     var speechMode: SpeechMode
+    var speechSourceLanguage: SpeechLanguage
+    var speechTargetLanguage: SpeechLanguage
     var volcengineAPIKey: String
     var overlayOpacity: Double
     var overlayFontSize: Double
@@ -12,8 +14,17 @@ struct AppSettings {
     static let defaults = AppSettings(
         speechProvider: .volcengine,
         speechMode: .englishToChinese,
+        speechSourceLanguage: .en,
+        speechTargetLanguage: .zh,
         volcengineAPIKey: "",
         overlayOpacity: 0.82,
         overlayFontSize: 22
     )
+
+    var speechConfiguration: SpeechTranslationConfiguration {
+        SpeechTranslationConfiguration(
+            sourceLanguage: speechSourceLanguage,
+            targetLanguage: speechTargetLanguage
+        )
+    }
 }

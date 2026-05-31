@@ -143,3 +143,13 @@ Easy Meeting 只需要 S2T，不需要服务端合成语音。
 - 实时语音：输出 `AudioFrame`，由语音客户端按服务商协议发送。
 
 `AudioFrame` 是跨模块边界的数据结构，只包含二进制音频、采样率、声道数、位深和时间戳。当前采集出口固定为 PCM 16kHz、单声道、16bit，小端有符号整型；UI、会议存储和导出模块不直接依赖火山 protobuf 字段。
+
+## 实时字幕提交规则
+
+AST 会分别返回原文字幕和译文字幕，每一侧都有 start、response、end 三类事件。Easy Meeting 的展示和落库规则如下：
+
+- `SourceSubtitleResponse` 和 `TranslationSubtitleResponse` 只更新当前草稿行，悬浮窗必须实时刷新同一行。
+- `SourceSubtitleEnd` 只确认原文草稿，不单独提交最终字幕。
+- `TranslationSubtitleEnd` 作为一次完整双语字幕的提交点；如果译文先结束，则等待源字幕结束时再提交。
+- 同一段字幕提交后，后续重复 end 事件只能更新草稿状态，不能再次追加行或写入数据库。
+- Swift 展示层和落库层保留文本指纹兜底，防止服务端重发或 helper 异常导致重复最终文本。
