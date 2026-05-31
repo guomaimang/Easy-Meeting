@@ -92,6 +92,7 @@ Easy Meeting 只需要 S2T，不需要服务端合成语音。
 - 已新增 Speech 领域模型。
 - 已新增火山 AST WebSocket 客户端骨架，支持读取设置中的 API Key 和 Resource ID 建连。
 - 开始录音后会把麦克风音频帧交给语音客户端。
+- 音频采集出口统一为 PCM 16kHz、单声道、16bit，小端有符号整型。
 - AST 业务消息使用 protobuf，项目采用 SwiftProtobuf 生成 Swift 类型并完成编解码。
 - 已发送 `StartSession`、`TaskRequest` 和 `FinishSession` protobuf 消息。
 - 已解析 AST protobuf 响应，并把字幕事件转换为 `RealtimeSpeechEvent`。
@@ -134,4 +135,4 @@ Swift 客户端必须使用 SwiftProtobuf 生成 AST 协议类型，不手写 pr
 - 本地录音：继续写入 `audio.m4a`。
 - 实时语音：输出 `AudioFrame`，由语音客户端按服务商协议发送。
 
-`AudioFrame` 是跨模块边界的数据结构，只包含二进制音频、采样率、声道数、位深和时间戳。UI、会议存储和导出模块不直接依赖火山 protobuf 字段。
+`AudioFrame` 是跨模块边界的数据结构，只包含二进制音频、采样率、声道数、位深和时间戳。当前采集出口固定为 PCM 16kHz、单声道、16bit，小端有符号整型；UI、会议存储和导出模块不直接依赖火山 protobuf 字段。

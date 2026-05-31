@@ -23,6 +23,16 @@ final class AudioRecorder: NSObject {
         }
         session.addInput(input)
 
+        output.audioSettings = [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVSampleRateKey: AudioStreamFormat.sampleRate,
+            AVNumberOfChannelsKey: AudioStreamFormat.channels,
+            AVLinearPCMBitDepthKey: AudioStreamFormat.bitsPerChannel,
+            AVLinearPCMIsFloatKey: false,
+            AVLinearPCMIsBigEndianKey: false,
+            AVLinearPCMIsNonInterleaved: false
+        ]
+
         guard session.canAddOutput(output) else {
             throw AudioRecordingError.cannotAddOutput
         }
@@ -31,8 +41,8 @@ final class AudioRecorder: NSObject {
         let writer = try AVAssetWriter(outputURL: url, fileType: .m4a)
         let settings: [String: Any] = [
             AVFormatIDKey: kAudioFormatMPEG4AAC,
-            AVSampleRateKey: 44_100,
-            AVNumberOfChannelsKey: 1,
+            AVSampleRateKey: AudioStreamFormat.sampleRate,
+            AVNumberOfChannelsKey: AudioStreamFormat.channels,
             AVEncoderBitRateKey: 96_000
         ]
         let writerInput = AVAssetWriterInput(mediaType: .audio, outputSettings: settings)
@@ -182,11 +192,23 @@ extension AudioRecorder: AVCaptureAudioDataOutputSampleBufferDelegate {
         let milliseconds = Int(CMTimeGetSeconds(timestamp) * 1000)
         let frame = AudioFrame(
             data: data,
-            sampleRate: Int(streamDescription.pointee.mSampleRate),
-            channels: Int(streamDescription.pointee.mChannelsPerFrame),
-            bitsPerChannel: Int(streamDescription.pointee.mBitsPerChannel),
+            sampleRate: normalizedSampleRate(streamDescription.pointee.mSampleRate),
+            channels: normalizedChannels(streamDescription.pointee.mChannelsPerFrame),
+            bitsPerChannel: normalizedBitsPerChannel(streamDescription.pointee.mBitsPerChannel),
             timestampMilliseconds: milliseconds
         )
         onAudioFrame(frame)
+    }
+
+    private func normalizedSampleRate(_ value: Float64) -> Int {
+        value > 0 ? Int(value) : AudioStreamFormat.sampleRate
+    }
+
+    private func normalizedChannels(_ value: UInt32) -> Int {
+        value > 0 ? Int(value) : AudioStreamFormat.channels
+    }
+
+    private func normalizedBitsPerChannel(_ value: UInt32) -> Int {
+        value > 0 ? Int(value) : AudioStreamFormat.bitsPerChannel
     }
 }

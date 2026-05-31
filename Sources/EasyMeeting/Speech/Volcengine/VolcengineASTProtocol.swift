@@ -12,9 +12,9 @@ struct VolcengineASTProtocol {
         request.user = user()
         request.sourceAudio = audioDescription(
             data: Data(),
-            sampleRate: 16_000,
-            channels: 1,
-            bitsPerChannel: 16
+            sampleRate: AudioStreamFormat.sampleRate,
+            channels: AudioStreamFormat.channels,
+            bitsPerChannel: AudioStreamFormat.bitsPerChannel
         )
         request.targetAudio = targetAudioDescription()
         request.request = requestParams(mode: mode)
@@ -80,9 +80,9 @@ struct VolcengineASTProtocol {
         var audio = Data_Speech_Understanding_Audio()
         audio.format = "pcm"
         audio.codec = "raw"
-        audio.rate = 16_000
-        audio.bits = 16
-        audio.channel = 1
+        audio.rate = Int32(AudioStreamFormat.sampleRate)
+        audio.bits = Int32(AudioStreamFormat.bitsPerChannel)
+        audio.channel = Int32(AudioStreamFormat.channels)
         return audio
     }
 
