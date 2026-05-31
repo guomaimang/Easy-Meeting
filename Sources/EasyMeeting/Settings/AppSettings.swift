@@ -8,6 +8,8 @@ struct AppSettings {
     var speechSourceLanguage: SpeechLanguage
     var speechTargetLanguage: SpeechLanguage
     var volcengineAPIKey: String
+    var azureSpeechKey: String
+    var azureSpeechRegion: String
     var overlayOpacity: Double
     var overlayFontSize: Double
 
@@ -17,6 +19,8 @@ struct AppSettings {
         speechSourceLanguage: .en,
         speechTargetLanguage: .zh,
         volcengineAPIKey: "",
+        azureSpeechKey: "",
+        azureSpeechRegion: "",
         overlayOpacity: 0.82,
         overlayFontSize: 22
     )

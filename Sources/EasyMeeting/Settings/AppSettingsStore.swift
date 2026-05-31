@@ -8,6 +8,8 @@ final class AppSettingsStore {
         static let speechSourceLanguage = "speechSourceLanguage"
         static let speechTargetLanguage = "speechTargetLanguage"
         static let volcengineAPIKey = "volcengineAPIKey"
+        static let azureSpeechKey = "azureSpeechKey"
+        static let azureSpeechRegion = "azureSpeechRegion"
         static let overlayOpacity = "overlayOpacity"
         static let overlayFontSize = "overlayFontSize"
     }
@@ -26,6 +28,8 @@ final class AppSettingsStore {
         let sourceLanguage = SpeechLanguage(rawValue: sourceRawValue) ?? fallback.speechSourceLanguage
         let targetLanguage = SpeechLanguage(rawValue: targetRawValue) ?? fallback.speechTargetLanguage
         let apiKey = KeychainStore.read(account: Keys.volcengineAPIKey)
+        let azureSpeechKey = KeychainStore.read(account: Keys.azureSpeechKey)
+        let azureSpeechRegion = defaults.string(forKey: Keys.azureSpeechRegion) ?? fallback.azureSpeechRegion
         let overlayOpacity = defaults.object(forKey: Keys.overlayOpacity) as? Double ?? fallback.overlayOpacity
         let overlayFontSize = defaults.object(forKey: Keys.overlayFontSize) as? Double ?? fallback.overlayFontSize
 
@@ -35,6 +39,8 @@ final class AppSettingsStore {
             speechSourceLanguage: sourceLanguage,
             speechTargetLanguage: targetLanguage,
             volcengineAPIKey: apiKey,
+            azureSpeechKey: azureSpeechKey,
+            azureSpeechRegion: azureSpeechRegion,
             overlayOpacity: Self.clampedOpacity(overlayOpacity),
             overlayFontSize: Self.clampedFontSize(overlayFontSize)
         )
@@ -45,15 +51,19 @@ final class AppSettingsStore {
         defaults.set(settings.speechMode.rawValue, forKey: Keys.speechMode)
         defaults.set(settings.speechSourceLanguage.rawValue, forKey: Keys.speechSourceLanguage)
         defaults.set(settings.speechTargetLanguage.rawValue, forKey: Keys.speechTargetLanguage)
+        defaults.set(settings.azureSpeechRegion, forKey: Keys.azureSpeechRegion)
         defaults.set(Self.clampedOpacity(settings.overlayOpacity), forKey: Keys.overlayOpacity)
         defaults.set(Self.clampedFontSize(settings.overlayFontSize), forKey: Keys.overlayFontSize)
         try KeychainStore.write(settings.volcengineAPIKey, account: Keys.volcengineAPIKey)
+        try KeychainStore.write(settings.azureSpeechKey, account: Keys.azureSpeechKey)
         self.settings = AppSettings(
             speechProvider: settings.speechProvider,
             speechMode: settings.speechMode,
             speechSourceLanguage: settings.speechSourceLanguage,
             speechTargetLanguage: settings.speechTargetLanguage,
             volcengineAPIKey: settings.volcengineAPIKey,
+            azureSpeechKey: settings.azureSpeechKey,
+            azureSpeechRegion: settings.azureSpeechRegion,
             overlayOpacity: Self.clampedOpacity(settings.overlayOpacity),
             overlayFontSize: Self.clampedFontSize(settings.overlayFontSize)
         )

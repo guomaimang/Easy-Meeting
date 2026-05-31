@@ -16,6 +16,8 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     let apiKeyField = NSSecureTextField()
     let apiKeyVisibleField = NSTextField()
     let apiKeyLengthLabel = NSTextField(labelWithString: "")
+    let regionField = NSTextField()
+    let apiKeyRowTitle = NSTextField(labelWithString: "")
     let pasteAPIKeyButton = NSButton(title: "粘贴", target: nil, action: nil)
     let revealAPIKeyButton = NSButton(title: "显示", target: nil, action: nil)
     let clearAPIKeyButton = NSButton(title: "清空", target: nil, action: nil)
@@ -30,6 +32,10 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     var sectionButtons: [SettingsSection: NSControl] = [:]
     var selectedSection: SettingsSection = .app
     var apiKeyVisible = false
+    // 按服务商分别缓存正在编辑的密钥，切换 provider 不丢输入
+    var volcengineKeyDraft = ""
+    var azureKeyDraft = ""
+    var lastSelectedProvider: SpeechProvider?
 
     init(
         settingsStore: AppSettingsStore,
@@ -79,7 +85,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
             try settingsStore.save(settings)
             overlayController.setOpacity(CGFloat(settings.overlayOpacity))
             overlayController.setFontSize(CGFloat(settings.overlayFontSize))
-            helperStatusField.stringValue = VolcengineHelperRuntime.diagnostic(settings: settings)
+            helperStatusField.stringValue = currentDiagnostic(for: settings)
             statusLabel.stringValue = "已保存"
         } catch {
             statusLabel.stringValue = error.localizedDescription
@@ -93,11 +99,25 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
             try settingsStore.save(settings)
             overlayController.setOpacity(CGFloat(settings.overlayOpacity))
             overlayController.setFontSize(CGFloat(settings.overlayFontSize))
-            helperStatusField.stringValue = VolcengineHelperRuntime.diagnostic(settings: settings)
+            helperStatusField.stringValue = currentDiagnostic(for: settings)
             statusLabel.stringValue = "已检查"
         } catch {
             statusLabel.stringValue = error.localizedDescription
         }
+    }
+
+    @objc func changeProvider() {
+        // 先把当前输入框内容写回对应草稿，再切换显示新 provider 的密钥
+        if let previous = lastSelectedProvider {
+            if previous == .azure {
+                azureKeyDraft = currentAPIKey()
+            } else {
+                volcengineKeyDraft = currentAPIKey()
+            }
+        }
+        lastSelectedProvider = selectedProvider()
+        setAPIKey(currentProviderKeyDraft())
+        renderSelectedSection()
     }
 
     @objc func selectSection(_ sender: NSControl) {
@@ -166,6 +186,8 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         contentView.addSubview(saveButton)
 
         providerPopUp.addItems(withTitles: SpeechProvider.allCases.map(\.title))
+        providerPopUp.target = self
+        providerPopUp.action = #selector(changeProvider)
         speechModePopUp.addItems(withTitles: SpeechMode.allCases.map(\.title))
         speechModePopUp.target = self
         speechModePopUp.action = #selector(changeSpeechMode)
@@ -200,10 +222,14 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         }
         selectSourceLanguage(settings.speechSourceLanguage)
         selectTargetLanguage(settings.speechTargetLanguage)
-        setAPIKey(settings.volcengineAPIKey)
+        volcengineKeyDraft = settings.volcengineAPIKey
+        azureKeyDraft = settings.azureSpeechKey
+        lastSelectedProvider = settings.speechProvider
+        regionField.stringValue = settings.azureSpeechRegion
+        setAPIKey(currentProviderKeyDraft())
         opacitySlider.doubleValue = settings.overlayOpacity
         fontSizeSlider.doubleValue = settings.overlayFontSize
-        helperStatusField.stringValue = VolcengineHelperRuntime.diagnostic(settings: settings)
+        helperStatusField.stringValue = currentDiagnostic(for: settings)
         microphoneStatusField.stringValue = audioDeviceManager.authorization.title
         reloadAudioDevices()
         updateOpacityLabel()
@@ -259,25 +285,4 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     func updateFontSizeLabel() {
         fontSizeValueLabel.stringValue = "\(Int(fontSizeSlider.doubleValue)) pt"
     }
-
-    private func currentSettings() -> AppSettings {
-        AppSettings(
-            speechProvider: selectedProvider(),
-            speechMode: selectedSpeechMode(),
-            speechSourceLanguage: selectedSourceLanguage(),
-            speechTargetLanguage: selectedTargetLanguage(),
-            volcengineAPIKey: currentAPIKey().trimmingCharacters(in: .whitespacesAndNewlines),
-            overlayOpacity: opacitySlider.doubleValue,
-            overlayFontSize: fontSizeSlider.doubleValue
-        )
-    }
-
-    private func selectedProvider() -> SpeechProvider {
-        let index = providerPopUp.indexOfSelectedItem
-        guard SpeechProvider.allCases.indices.contains(index) else {
-            return .volcengine
-        }
-        return SpeechProvider.allCases[index]
-    }
-
 }

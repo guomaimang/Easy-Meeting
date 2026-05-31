@@ -76,6 +76,13 @@ extension SettingsWindowController {
             statusLabel.stringValue = "语种组合无效：源语种或目标语种必须包含中文/英文，zhen 必须两边同时选择。"
             return false
         }
+        if selectedProvider() == .azure {
+            let validation = AzureLanguageMapping.validate(configuration)
+            if let message = validation.message {
+                statusLabel.stringValue = message
+                return false
+            }
+        }
         return true
     }
 }

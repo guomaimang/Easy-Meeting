@@ -53,13 +53,52 @@ extension SettingsWindowController {
 
         let keyGroup = groupView(y: 44, height: 102)
         page.addSubview(keyGroup)
+        if selectedSection == .speech, providerPopUp.indexOfSelectedItem == SpeechProvider.allCases.firstIndex(of: .azure) {
+            buildAzureKeyGroup(keyGroup)
+        } else {
+            buildVolcengineKeyGroup(keyGroup)
+        }
+
+        let helperGroup = groupView(y: 0, height: 40)
+        page.addSubview(helperGroup)
+        addRowTitle("本地 helper", to: helperGroup, y: 10)
+        helperStatusField.frame = NSRect(x: 220, y: 11, width: 230, height: 22)
+        helperStatusField.textColor = .secondaryLabelColor
+        let checkButton = NSButton(title: "检查配置", target: self, action: #selector(checkConfiguration))
+        checkButton.frame = NSRect(x: 466, y: 6, width: 92, height: 30)
+        helperGroup.addSubview(helperStatusField)
+        helperGroup.addSubview(checkButton)
+        return page
+    }
+
+    /// 火山密钥分组：固定 Resource ID + 火山 API Key。
+    private func buildVolcengineKeyGroup(_ keyGroup: NSView) {
         addRowTitle("Resource ID", to: keyGroup, y: 74)
         resourceValueLabel.frame = NSRect(x: 220, y: 75, width: 330, height: 22)
         resourceValueLabel.textColor = .secondaryLabelColor
         keyGroup.addSubview(resourceValueLabel)
         addDivider(to: keyGroup, y: 54)
 
-        addRowTitle("火山 API Key", to: keyGroup, y: 20)
+        apiKeyRowTitle.stringValue = "火山 API Key"
+        addKeyRow(to: keyGroup)
+    }
+
+    /// Azure 密钥分组：区域 + Azure 语音密钥。
+    private func buildAzureKeyGroup(_ keyGroup: NSView) {
+        addRowTitle("区域 Region", to: keyGroup, y: 74)
+        regionField.frame = NSRect(x: 220, y: 73, width: 230, height: 24)
+        regionField.placeholderString = "如 eastasia"
+        regionField.delegate = self
+        keyGroup.addSubview(regionField)
+        addDivider(to: keyGroup, y: 54)
+
+        apiKeyRowTitle.stringValue = "Azure 语音密钥"
+        addKeyRow(to: keyGroup)
+    }
+
+    /// 复用同一套密钥输入控件（明/密文 + 粘贴/显示/清空 + 长度提示）。
+    private func addKeyRow(to keyGroup: NSView) {
+        addRowTitleControl(apiKeyRowTitle, to: keyGroup, y: 20)
         apiKeyField.frame = NSRect(x: 220, y: 18, width: 190, height: 24)
         apiKeyVisibleField.frame = apiKeyField.frame
         pasteAPIKeyButton.frame = NSRect(x: 418, y: 15, width: 44, height: 30)
@@ -72,17 +111,6 @@ extension SettingsWindowController {
         keyGroup.addSubview(revealAPIKeyButton)
         keyGroup.addSubview(clearAPIKeyButton)
         keyGroup.addSubview(apiKeyLengthLabel)
-
-        let helperGroup = groupView(y: 0, height: 40)
-        page.addSubview(helperGroup)
-        addRowTitle("本地 helper", to: helperGroup, y: 10)
-        helperStatusField.frame = NSRect(x: 220, y: 11, width: 230, height: 22)
-        helperStatusField.textColor = .secondaryLabelColor
-        let checkButton = NSButton(title: "检查配置", target: self, action: #selector(checkConfiguration))
-        checkButton.frame = NSRect(x: 466, y: 6, width: 92, height: 30)
-        helperGroup.addSubview(helperStatusField)
-        helperGroup.addSubview(checkButton)
-        return page
     }
 
     func microphonePage() -> NSView {
@@ -132,6 +160,13 @@ extension SettingsWindowController {
         label.frame = NSRect(x: 18, y: y, width: 170, height: 22)
         view.addSubview(label)
         return label
+    }
+
+    /// 复用已有的标题 label（文本随 provider 切换变化）。
+    func addRowTitleControl(_ label: NSTextField, to view: NSView, y: CGFloat) {
+        label.font = .systemFont(ofSize: 14, weight: .semibold)
+        label.frame = NSRect(x: 18, y: y, width: 170, height: 22)
+        view.addSubview(label)
     }
 
     func addDivider(to view: NSView, y: CGFloat) {

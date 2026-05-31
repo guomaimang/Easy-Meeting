@@ -6,6 +6,8 @@ enum SpeechClientFactory {
         switch settings.speechProvider {
         case .volcengine:
             VolcengineHelperSpeechClient(settings: settings)
+        case .azure:
+            AzureHelperSpeechClient(settings: settings)
         }
     }
 }
