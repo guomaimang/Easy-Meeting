@@ -63,8 +63,8 @@ final class OverlayWindowController: NSWindowController {
         overlayView.needsDisplay = true
     }
 
-    func showSampleCaption() {
-        showStatus(source: "The meeting assistant is ready.", translation: "会议助手已准备就绪。")
+    func showReadyStatus() {
+        showStatus(source: "Easy Meeting is ready.", translation: "会议助手已准备就绪。")
     }
 
     func showStatus(source: String, translation: String) {

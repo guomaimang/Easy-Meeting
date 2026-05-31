@@ -35,11 +35,16 @@ final class MeetingSessionController {
                 }
 
                 let meeting = try meetingStore.startMeeting(mode: speechMode)
+                let client = startSpeech(for: meeting, onStatus: onStatus)
                 try audioRecorder.startRecording(
                     to: meeting.audioURL,
                     selectedDeviceID: audioDeviceManager.selectedDeviceID
                 )
-                startSpeech(for: meeting, onStatus: onStatus)
+                audioRecorder.onAudioFrame = { frame in
+                    Task { @MainActor in
+                        client.sendAudioFrame(frame)
+                    }
+                }
                 onStatus(
                     "正在录音：\(audioDeviceManager.selectedDeviceName())",
                     "\(speechMode.title)：音频保存到 \(meeting.audioURL.lastPathComponent)"
@@ -73,7 +78,7 @@ final class MeetingSessionController {
     private func startSpeech(
         for meeting: MeetingRecord,
         onStatus: @escaping @MainActor (String, String) -> Void
-    ) {
+    ) -> SpeechClient {
         let client = SpeechClientFactory.make(settings: settingsStore.settings)
         speechClient = client
         client.start(mode: speechMode, meetingID: meeting.id) { [weak self] event in
@@ -86,6 +91,7 @@ final class MeetingSessionController {
                 onStatus("转录写入失败", error.localizedDescription)
             }
         }
+        return client
     }
 
     private func finishMeeting(onStatus: @escaping @MainActor (String, String) -> Void) {

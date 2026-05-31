@@ -83,7 +83,7 @@ Core Data：
 | path | 导出相对路径 |
 | created_at | 创建时间 |
 
-## 当前 POC 状态
+## 当前实现状态
 
 - 已创建 `meetings` 表。
 - 已创建 `transcript_segments` 表。

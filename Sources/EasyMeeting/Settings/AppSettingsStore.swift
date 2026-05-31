@@ -6,6 +6,7 @@ final class AppSettingsStore {
         static let speechProvider = "speechProvider"
         static let volcengineResourceID = "volcengineResourceID"
         static let volcengineAppKey = "volcengineAppKey"
+        static let volcengineAccessKey = "volcengineAccessKey"
     }
 
     private let defaults = UserDefaults.standard
@@ -17,11 +18,13 @@ final class AppSettingsStore {
         let provider = SpeechProvider(rawValue: providerRawValue) ?? fallback.speechProvider
         let resourceID = defaults.string(forKey: Keys.volcengineResourceID) ?? fallback.volcengineResourceID
         let appKey = KeychainStore.read(account: Keys.volcengineAppKey)
+        let accessKey = KeychainStore.read(account: Keys.volcengineAccessKey)
 
         settings = AppSettings(
             speechProvider: provider,
             volcengineResourceID: resourceID,
-            volcengineAppKey: appKey
+            volcengineAppKey: appKey,
+            volcengineAccessKey: accessKey
         )
     }
 
@@ -29,6 +32,7 @@ final class AppSettingsStore {
         defaults.set(settings.speechProvider.rawValue, forKey: Keys.speechProvider)
         defaults.set(settings.volcengineResourceID, forKey: Keys.volcengineResourceID)
         try KeychainStore.write(settings.volcengineAppKey, account: Keys.volcengineAppKey)
+        try KeychainStore.write(settings.volcengineAccessKey, account: Keys.volcengineAccessKey)
         self.settings = settings
     }
 }

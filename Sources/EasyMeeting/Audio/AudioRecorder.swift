@@ -8,6 +8,7 @@ final class AudioRecorder: NSObject {
     private var writerInput: AVAssetWriterInput?
     private var didStartWriting = false
     private(set) var isRecording = false
+    var onAudioFrame: (@Sendable (AudioFrame) -> Void)?
 
     func startRecording(to url: URL, selectedDeviceID: String?) throws {
         stopCaptureOnly()
@@ -85,6 +86,7 @@ final class AudioRecorder: NSObject {
         writer = nil
         writerInput = nil
         didStartWriting = false
+        onAudioFrame = nil
     }
 
     private func selectedCaptureDevice(id selectedDeviceID: String?) throws -> AVCaptureDevice {
@@ -125,6 +127,8 @@ extension AudioRecorder: AVCaptureAudioDataOutputSampleBufferDelegate {
     }
 
     private func append(_ sampleBuffer: CMSampleBuffer) {
+        emitAudioFrame(from: sampleBuffer)
+
         guard isRecording,
               let writer,
               let writerInput else {
@@ -145,5 +149,44 @@ extension AudioRecorder: AVCaptureAudioDataOutputSampleBufferDelegate {
         if writerInput.isReadyForMoreMediaData {
             writerInput.append(sampleBuffer)
         }
+    }
+
+    private func emitAudioFrame(from sampleBuffer: CMSampleBuffer) {
+        guard let onAudioFrame,
+              let format = CMSampleBufferGetFormatDescription(sampleBuffer),
+              let streamDescription = CMAudioFormatDescriptionGetStreamBasicDescription(format),
+              let dataBuffer = CMSampleBufferGetDataBuffer(sampleBuffer) else {
+            return
+        }
+
+        let length = CMBlockBufferGetDataLength(dataBuffer)
+        guard length > 0 else { return }
+
+        var data = Data(count: length)
+        let result = data.withUnsafeMutableBytes { bytes in
+            guard let baseAddress = bytes.baseAddress else {
+                return OSStatus(paramErr)
+            }
+
+            return CMBlockBufferCopyDataBytes(
+                dataBuffer,
+                atOffset: 0,
+                dataLength: length,
+                destination: baseAddress
+            )
+        }
+
+        guard result == kCMBlockBufferNoErr else { return }
+
+        let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+        let milliseconds = Int(CMTimeGetSeconds(timestamp) * 1000)
+        let frame = AudioFrame(
+            data: data,
+            sampleRate: Int(streamDescription.pointee.mSampleRate),
+            channels: Int(streamDescription.pointee.mChannelsPerFrame),
+            bitsPerChannel: Int(streamDescription.pointee.mBitsPerChannel),
+            timestampMilliseconds: milliseconds
+        )
+        onAudioFrame(frame)
     }
 }

@@ -6,13 +6,14 @@ final class SettingsWindowController: NSWindowController {
     private let providerPopUp = NSPopUpButton()
     private let resourceField = NSTextField()
     private let appKeyField = NSSecureTextField()
+    private let accessKeyField = NSSecureTextField()
     private let statusLabel = NSTextField(labelWithString: "")
 
     init(settingsStore: AppSettingsStore) {
         self.settingsStore = settingsStore
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 460, height: 244),
+            contentRect: NSRect(x: 0, y: 0, width: 500, height: 292),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -40,7 +41,8 @@ final class SettingsWindowController: NSWindowController {
             let settings = AppSettings(
                 speechProvider: selectedProvider(),
                 volcengineResourceID: resourceField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines),
-                volcengineAppKey: appKeyField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                volcengineAppKey: appKeyField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines),
+                volcengineAccessKey: accessKeyField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
             )
             try settingsStore.save(settings)
             statusLabel.stringValue = "已保存"
@@ -53,31 +55,35 @@ final class SettingsWindowController: NSWindowController {
         guard let contentView = window?.contentView else { return }
 
         providerPopUp.addItems(withTitles: SpeechProvider.allCases.map(\.title))
-        providerPopUp.frame = NSRect(x: 160, y: 180, width: 220, height: 28)
+        providerPopUp.frame = NSRect(x: 176, y: 228, width: 250, height: 28)
         contentView.addSubview(providerPopUp)
 
-        resourceField.frame = NSRect(x: 160, y: 130, width: 220, height: 24)
+        resourceField.frame = NSRect(x: 176, y: 178, width: 250, height: 24)
         contentView.addSubview(resourceField)
 
-        appKeyField.frame = NSRect(x: 160, y: 80, width: 220, height: 24)
+        appKeyField.frame = NSRect(x: 176, y: 128, width: 250, height: 24)
         contentView.addSubview(appKeyField)
 
-        statusLabel.frame = NSRect(x: 160, y: 34, width: 160, height: 24)
+        accessKeyField.frame = NSRect(x: 176, y: 78, width: 250, height: 24)
+        contentView.addSubview(accessKeyField)
+
+        statusLabel.frame = NSRect(x: 176, y: 34, width: 180, height: 24)
         statusLabel.textColor = .secondaryLabelColor
         contentView.addSubview(statusLabel)
 
-        addLabel("语音服务", y: 184)
-        addLabel("火山 Resource ID", y: 134)
-        addLabel("火山 App Key", y: 84)
+        addLabel("语音服务", y: 232)
+        addLabel("火山 Resource ID", y: 182)
+        addLabel("火山 App Key", y: 132)
+        addLabel("火山 Access Key", y: 82)
 
         let saveButton = NSButton(title: "保存", target: self, action: #selector(save))
-        saveButton.frame = NSRect(x: 330, y: 30, width: 80, height: 30)
+        saveButton.frame = NSRect(x: 362, y: 30, width: 80, height: 30)
         contentView.addSubview(saveButton)
     }
 
     private func addLabel(_ title: String, y: CGFloat) {
         let label = NSTextField(labelWithString: title)
-        label.frame = NSRect(x: 44, y: y, width: 100, height: 22)
+        label.frame = NSRect(x: 44, y: y, width: 116, height: 22)
         window?.contentView?.addSubview(label)
     }
 
@@ -88,13 +94,14 @@ final class SettingsWindowController: NSWindowController {
         }
         resourceField.stringValue = settings.volcengineResourceID
         appKeyField.stringValue = settings.volcengineAppKey
+        accessKeyField.stringValue = settings.volcengineAccessKey
         statusLabel.stringValue = ""
     }
 
     private func selectedProvider() -> SpeechProvider {
         let index = providerPopUp.indexOfSelectedItem
         guard SpeechProvider.allCases.indices.contains(index) else {
-            return .mock
+            return .volcengine
         }
 
         return SpeechProvider.allCases[index]

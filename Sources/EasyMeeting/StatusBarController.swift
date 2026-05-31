@@ -27,7 +27,7 @@ final class StatusBarController: NSObject {
     }
 
     @objc private func showOverlay() {
-        overlayController.showSampleCaption()
+        overlayController.showReadyStatus()
     }
 
     @objc private func toggleOverlay() {
@@ -121,7 +121,7 @@ final class StatusBarController: NSObject {
 
     private func rebuildMenu() {
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "显示示例字幕", action: #selector(showOverlay), keyEquivalent: "s"))
+        menu.addItem(NSMenuItem(title: "显示悬浮窗", action: #selector(showOverlay), keyEquivalent: "s"))
         menu.addItem(NSMenuItem(title: "显示/隐藏悬浮窗", action: #selector(toggleOverlay), keyEquivalent: "h"))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(recordingMenuItem())

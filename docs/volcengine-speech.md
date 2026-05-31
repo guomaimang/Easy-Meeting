@@ -7,7 +7,7 @@
 
 ## 结论
 
-POC 优先使用实时语音翻译 API 的 S2T 能力。
+优先使用实时语音翻译 API 的 S2T 能力。
 
 原因：
 
@@ -56,8 +56,10 @@ Easy Meeting 只需要 S2T，不需要服务端合成语音。
 
 具体参数以后端文档和控制台配置为准，客户端侧需要抽象出：
 
-- Access Key / Secret Key 或临时 token。
-- App ID / Cluster / Resource ID 等服务标识。
+- App Key。
+- Access Key。
+- Resource ID。
+- App ID 等可选服务标识。
 - 源语言。
 - 目标语言。
 - 翻译模式。
@@ -85,11 +87,48 @@ Easy Meeting 只需要 S2T，不需要服务端合成语音。
 
 火山接口字段只允许出现在基础设施层，方便未来替换服务商。
 
-## 当前 POC 状态
+## 当前实现状态
 
 - 已新增 Speech 领域模型。
-- 已新增 Mock 实时语音客户端。
 - 已新增火山 AST WebSocket 客户端骨架，支持读取设置中的 API Key 和 Resource ID 建连。
-- 开始录音后会模拟返回实时原文和译文字幕。
-- Mock 事件会写入 SQLite 的 `transcript_segments` 和会议目录的 `transcript.txt`。
-- AST 业务消息是 protobuf，下一步需要接入官方 proto 生成的 Swift codec，再发送实时音频帧。
+- 开始录音后会把麦克风音频帧交给语音客户端。
+- AST 业务消息使用 protobuf，项目采用 SwiftProtobuf 生成 Swift 类型并完成编解码。
+- 当前客户端只能反馈连接状态和 WebSocket 错误，不能作为完整实时字幕能力交付。
+
+## AST 参考客户端结论
+
+`ref` 目录里的 Go、Python、Java 示例都指向同一套 AST v4 协议：
+
+- 地址：`wss://openspeech.bytedance.com/api/v4/ast/v2/translate`。
+- WebSocket Header：
+  - `X-Api-App-Key`
+  - `X-Api-Access-Key`
+  - `X-Api-Resource-Id`
+  - `X-Api-Connect-Id`
+- 上行业务消息为 `TranslateRequest` protobuf 二进制。
+- 下行业务消息为 `TranslateResponse` protobuf 二进制。
+- 会话事件顺序：
+  1. `StartSession`
+  2. 服务端返回 `SessionStarted`
+  3. 持续发送 `TaskRequest` 音频分片
+  4. 停止时发送 `FinishSession`
+  5. 服务端返回字幕事件和 `SessionFinished`
+
+Swift 客户端必须使用 SwiftProtobuf 生成 AST 协议类型，不手写 protobuf 二进制 codec。生成代码应放在 Speech 基础设施边界内，UI、存储和导出模块只依赖 `RealtimeSpeechEvent` 等领域模型。
+
+## SwiftProtobuf 方案
+
+- SwiftPM 引入 `apple/swift-protobuf` 的 `SwiftProtobuf` 运行时，并固定版本以保证构建可重复。
+- 使用官方 AST proto 生成 `TranslateRequest`、`TranslateResponse` 和相关事件类型。
+- 生成文件按服务商边界放入 `Sources/EasyMeeting/Speech/Volcengine/Generated/`。
+- 业务代码只在 `VolcengineASTSpeechClient` 和火山协议适配层内引用生成类型。
+- 后续补充固定的生成脚本，确保 proto 更新和 Swift 代码生成可重复。
+
+## 音频管道设计
+
+录音模块必须同时服务两个消费者：
+
+- 本地录音：继续写入 `audio.m4a`。
+- 实时语音：输出 `AudioFrame`，由语音客户端按服务商协议发送。
+
+`AudioFrame` 是跨模块边界的数据结构，只包含二进制音频、采样率、声道数、位深和时间戳。UI、会议存储和导出模块不直接依赖火山 protobuf 字段。

@@ -4,10 +4,12 @@ struct AppSettings {
     var speechProvider: SpeechProvider
     var volcengineResourceID: String
     var volcengineAppKey: String
+    var volcengineAccessKey: String
 
     static let defaults = AppSettings(
-        speechProvider: .mock,
+        speechProvider: .volcengine,
         volcengineResourceID: "volc.service_type.10053",
-        volcengineAppKey: ""
+        volcengineAppKey: "",
+        volcengineAccessKey: ""
     )
 }

@@ -1,7 +1,7 @@
 import Foundation
 
 @MainActor
-protocol SpeechClient {
+protocol SpeechClient: AnyObject, Sendable {
     var isRunning: Bool { get }
 
     func start(
@@ -9,6 +9,8 @@ protocol SpeechClient {
         meetingID: UUID,
         onEvent: @escaping @MainActor (RealtimeSpeechEvent) -> Void
     )
+
+    func sendAudioFrame(_ frame: AudioFrame)
 
     func stop()
 }
