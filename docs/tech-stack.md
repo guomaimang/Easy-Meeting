@@ -1,0 +1,69 @@
+# 技术栈
+
+## 目标
+
+Easy Meeting 是一个 macOS 本地会议助手，第一阶段先完成 POC：
+
+- 透明悬浮字幕窗。
+- 选择麦克风输入。
+- 实时识别和翻译。
+- 本地保存录音、转录、翻译和历史记录。
+- 尽可能降低悬浮窗被屏幕共享捕获的概率，但不承诺全场景不可见。
+
+## 客户端
+
+- 语言：Swift。
+- UI：SwiftUI + AppKit。
+- 悬浮窗：AppKit `NSPanel` / `NSWindow`。
+- 音频采集：AVFoundation / AVAudioEngine。
+- 本地数据库：SQLite。
+- 本地文件：Application Support 目录。
+- 密钥保存：Keychain。
+- 普通配置：UserDefaults。
+- 日志：开发环境 DEBUG 级别，生产环境 INFO 级别。
+- 打包：SwiftPM 构建可执行文件，脚本组装 macOS `.app`。
+
+## 外部服务
+
+第一阶段优先接入火山引擎/豆包实时语音能力：
+
+- 实时语音翻译：用于英文转中文、中英互译、粤语转中文等会议字幕场景。
+- 实时语音识别：作为备选链路，用于只需要原文转录或翻译链路拆分时。
+
+## 为什么选择原生 macOS
+
+原生方案对以下能力控制更稳定：
+
+- 透明、置顶、穿透点击的悬浮窗。
+- macOS 麦克风权限和音频设备选择。
+- 菜单栏、快捷键、登录启动等系统体验。
+- 后续接入本地模型或 Core ML。
+
+Electron/Tauri 可以作为后续跨平台方案评估，但第一阶段不采用。
+
+## 不做的事情
+
+- 不采集系统 Loopback 音频。
+- 不使用私有 API 强行绕过录屏或屏幕共享。
+- 不承诺全屏共享时悬浮窗一定不可见。
+- 不把录音二进制直接存入数据库。
+
+## 本地运行
+
+调试编译：
+
+```bash
+swift build
+```
+
+组装本地 `.app`：
+
+```bash
+zsh scripts/package-app.sh
+```
+
+生成路径：
+
+```text
+.build/debug/Easy Meeting.app
+```
