@@ -100,8 +100,14 @@ final class StatusBarController: NSObject {
               let mode = SpeechMode(rawValue: rawValue) else {
             return
         }
-        meetingSessionController.speechMode = mode
-        overlayController.showStatus(source: "已切换翻译模式", translation: mode.title)
+        var settings = settingsStore.settings
+        settings.speechMode = mode
+        do {
+            try settingsStore.save(settings)
+            overlayController.showStatus(source: "已切换翻译模式", translation: "\(mode.title)：\(mode.detail)")
+        } catch {
+            overlayController.showStatus(source: "翻译模式保存失败", translation: error.localizedDescription)
+        }
         rebuildMenu()
     }
 
@@ -219,7 +225,7 @@ final class StatusBarController: NSObject {
         SpeechMode.allCases.forEach { mode in
             let modeItem = NSMenuItem(title: mode.title, action: #selector(selectSpeechMode), keyEquivalent: "")
             modeItem.representedObject = mode.rawValue
-            modeItem.state = mode == meetingSessionController.speechMode ? .on : .off
+            modeItem.state = mode == settingsStore.settings.speechMode ? .on : .off
             submenu.addItem(modeItem)
         }
 

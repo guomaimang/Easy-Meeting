@@ -104,6 +104,15 @@
 
 `s2t` 阶段忽略 `TTSSentenceStart`、`TTSResponse`、`TTSSentenceEnd`，但 helper 解码层不能因未知或暂不用事件崩溃。
 
+## 字幕事件边界
+
+- 只有 `SourceSubtitleResponse`、`SourceSubtitleEnd`、`TranslationSubtitleResponse` 和 `TranslationSubtitleEnd` 可以映射为字幕事件。
+- `UsageResponse` 只用于计量日志，不允许进入 UI 字幕、SQLite 转录或导出文件。
+- `SessionStarted`、`SessionFinished`、`AudioMuted` 等会话状态只允许作为系统状态提示，不允许写入会议转录。
+- helper 的 stderr 调试日志只进入开发诊断日志，不允许覆盖悬浮字幕。
+- UI 展示会话字幕历史；增量字幕更新当前行，最终字幕进入历史队列。
+- 悬浮窗字幕区支持滚轮翻阅历史；当用户停留在底部时自动跟随最新字幕，向上翻阅后暂停自动滚动，直到用户回到底部。
+
 ## 响应字段
 
 常用响应字段：

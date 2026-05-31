@@ -136,7 +136,7 @@ final class VolcengineHelperSpeechClient: SpeechClient, @unchecked Sendable {
             let event = try JSONDecoder().decode(VolcengineHelperEvent.self, from: data)
             switch event.type {
             case "status":
-                emitStatus(event.message ?? "火山 helper 状态", event.detail ?? "")
+                NSLog("火山 helper 状态：%@ %@", event.message ?? "", event.detail ?? "")
             case "subtitle":
                 emitSpeechEvent(event)
             case "error":
@@ -163,7 +163,7 @@ final class VolcengineHelperSpeechClient: SpeechClient, @unchecked Sendable {
 
     private func handleStderr(_ data: Data) {
         guard let text = String(data: data, encoding: .utf8) else { return }
-        emitStatus("火山 helper 日志", text.trimmingCharacters(in: .whitespacesAndNewlines))
+        NSLog("火山 helper 日志：%@", text.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
     private func handleTermination(status: Int32) {

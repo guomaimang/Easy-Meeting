@@ -1,23 +1,33 @@
 import AppKit
 
 @MainActor
-final class SettingsWindowController: NSWindowController {
-    private let settingsStore: AppSettingsStore
-    private let audioDeviceManager: AudioDeviceManager
-    private let overlayController: OverlayWindowController
-    private let sidebarStack = NSStackView()
-    private let contentContainer = NSView()
-    private let providerPopUp = NSPopUpButton()
-    private let resourceValueLabel = NSTextField(labelWithString: AppSettings.volcengineResourceID)
-    private let apiKeyField = NSSecureTextField()
-    private let opacitySlider = NSSlider(value: 0.82, minValue: 0.25, maxValue: 1, target: nil, action: nil)
-    private let opacityValueLabel = NSTextField(labelWithString: "")
-    private let helperStatusField = NSTextField(labelWithString: "")
-    private let microphoneStatusField = NSTextField(labelWithString: "")
-    private let audioDevicePopUp = NSPopUpButton()
-    private let statusLabel = NSTextField(labelWithString: "")
-    private var sectionButtons: [SettingsSection: NSButton] = [:]
-    private var selectedSection: SettingsSection = .app
+final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
+    let settingsStore: AppSettingsStore
+    let audioDeviceManager: AudioDeviceManager
+    let overlayController: OverlayWindowController
+    let sidebarStack = NSStackView()
+    let contentContainer = SettingsBackgroundView()
+    let providerPopUp = NSPopUpButton()
+    let speechModePopUp = NSPopUpButton()
+    let speechModeDetailLabel = NSTextField(labelWithString: "")
+    let resourceValueLabel = NSTextField(labelWithString: AppSettings.volcengineResourceID)
+    let apiKeyField = NSSecureTextField()
+    let apiKeyVisibleField = NSTextField()
+    let apiKeyLengthLabel = NSTextField(labelWithString: "")
+    let pasteAPIKeyButton = NSButton(title: "粘贴", target: nil, action: nil)
+    let revealAPIKeyButton = NSButton(title: "显示", target: nil, action: nil)
+    let clearAPIKeyButton = NSButton(title: "清空", target: nil, action: nil)
+    let opacitySlider = NSSlider(value: 0.82, minValue: 0.25, maxValue: 1, target: nil, action: nil)
+    let opacityValueLabel = NSTextField(labelWithString: "")
+    let fontSizeSlider = NSSlider(value: 22, minValue: 14, maxValue: 34, target: nil, action: nil)
+    let fontSizeValueLabel = NSTextField(labelWithString: "")
+    let helperStatusField = NSTextField(labelWithString: "")
+    let microphoneStatusField = NSTextField(labelWithString: "")
+    let audioDevicePopUp = NSPopUpButton()
+    let statusLabel = NSTextField(labelWithString: "")
+    var sectionButtons: [SettingsSection: NSButton] = [:]
+    var selectedSection: SettingsSection = .app
+    var apiKeyVisible = false
 
     init(
         settingsStore: AppSettingsStore,
@@ -29,12 +39,13 @@ final class SettingsWindowController: NSWindowController {
         self.overlayController = overlayController
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 740, height: 420),
+            contentRect: NSRect(x: 0, y: 0, width: 920, height: 620),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
         )
         window.title = "Easy Meeting 设置"
+        window.contentView = SettingsBackgroundView(frame: NSRect(x: 0, y: 0, width: 920, height: 620))
         window.center()
 
         super.init(window: window)
@@ -52,11 +63,17 @@ final class SettingsWindowController: NSWindowController {
         NSApp.activate()
     }
 
+    override func mouseDown(with event: NSEvent) {
+        window?.makeFirstResponder(nil)
+        super.mouseDown(with: event)
+    }
+
     @objc private func save() {
         do {
             let settings = currentSettings()
             try settingsStore.save(settings)
             overlayController.setOpacity(CGFloat(settings.overlayOpacity))
+            overlayController.setFontSize(CGFloat(settings.overlayFontSize))
             helperStatusField.stringValue = VolcengineHelperRuntime.diagnostic(settings: settings)
             statusLabel.stringValue = "已保存"
         } catch {
@@ -64,10 +81,12 @@ final class SettingsWindowController: NSWindowController {
         }
     }
 
-    @objc private func checkConfiguration() {
+    @objc func checkConfiguration() {
         do {
             let settings = currentSettings()
             try settingsStore.save(settings)
+            overlayController.setOpacity(CGFloat(settings.overlayOpacity))
+            overlayController.setFontSize(CGFloat(settings.overlayFontSize))
             helperStatusField.stringValue = VolcengineHelperRuntime.diagnostic(settings: settings)
             statusLabel.stringValue = "已检查"
         } catch {
@@ -76,7 +95,7 @@ final class SettingsWindowController: NSWindowController {
     }
 
     @objc private func selectSection(_ sender: NSButton) {
-        guard let section = sender.representedObject as? SettingsSection else { return }
+        guard let section = SettingsSection(rawValue: sender.tag) else { return }
         selectedSection = section
         renderSelectedSection()
     }
@@ -86,7 +105,16 @@ final class SettingsWindowController: NSWindowController {
         overlayController.setOpacity(CGFloat(opacitySlider.doubleValue))
     }
 
-    @objc private func requestMicrophonePermission() {
+    @objc func changeSpeechMode() {
+        updateSpeechModeDetail()
+    }
+
+    @objc func changeFontSize() {
+        updateFontSizeLabel()
+        overlayController.setFontSize(CGFloat(fontSizeSlider.doubleValue))
+    }
+
+    @objc func requestMicrophonePermission() {
         Task { @MainActor in
             let authorization = await audioDeviceManager.requestPermission()
             microphoneStatusField.stringValue = authorization.title
@@ -95,7 +123,7 @@ final class SettingsWindowController: NSWindowController {
         }
     }
 
-    @objc private func refreshAudioDevices() {
+    @objc func refreshAudioDevices() {
         audioDeviceManager.refreshDevices()
         microphoneStatusField.stringValue = audioDeviceManager.authorization.title
         reloadAudioDevices()
@@ -115,34 +143,41 @@ final class SettingsWindowController: NSWindowController {
         sidebarStack.orientation = .vertical
         sidebarStack.spacing = 8
         sidebarStack.alignment = .leading
-        sidebarStack.frame = NSRect(x: 16, y: 72, width: 128, height: 300)
+        sidebarStack.frame = NSRect(x: 20, y: 144, width: 172, height: 380)
         contentView.addSubview(sidebarStack)
 
         SettingsSection.allCases.forEach { section in
             let button = NSButton(title: section.title, target: self, action: #selector(selectSection))
-            button.representedObject = section
+            button.tag = section.rawValue
             button.setButtonType(.pushOnPushOff)
             button.bezelStyle = .rounded
-            button.frame.size = NSSize(width: 112, height: 30)
+            button.frame.size = NSSize(width: 148, height: 34)
             sidebarStack.addArrangedSubview(button)
             sectionButtons[section] = button
         }
 
-        contentContainer.frame = NSRect(x: 164, y: 72, width: 544, height: 300)
+        contentContainer.frame = NSRect(x: 220, y: 96, width: 660, height: 480)
         contentContainer.wantsLayer = true
         contentView.addSubview(contentContainer)
 
-        statusLabel.frame = NSRect(x: 164, y: 24, width: 240, height: 24)
+        statusLabel.frame = NSRect(x: 220, y: 38, width: 360, height: 24)
         statusLabel.textColor = .secondaryLabelColor
         contentView.addSubview(statusLabel)
 
         let saveButton = NSButton(title: "保存", target: self, action: #selector(save))
-        saveButton.frame = NSRect(x: 628, y: 20, width: 80, height: 30)
+        saveButton.frame = NSRect(x: 800, y: 34, width: 80, height: 30)
         contentView.addSubview(saveButton)
 
         providerPopUp.addItems(withTitles: SpeechProvider.allCases.map(\.title))
+        speechModePopUp.addItems(withTitles: SpeechMode.allCases.map(\.title))
+        speechModePopUp.target = self
+        speechModePopUp.action = #selector(changeSpeechMode)
+        speechModeDetailLabel.textColor = .secondaryLabelColor
+        setupAPIKeyControls()
         opacitySlider.target = self
         opacitySlider.action = #selector(changeOpacity)
+        fontSizeSlider.target = self
+        fontSizeSlider.action = #selector(changeFontSize)
         audioDevicePopUp.target = self
         audioDevicePopUp.action = #selector(selectAudioDevice)
         helperStatusField.lineBreakMode = .byTruncatingMiddle
@@ -153,12 +188,18 @@ final class SettingsWindowController: NSWindowController {
         if let index = SpeechProvider.allCases.firstIndex(of: settings.speechProvider) {
             providerPopUp.selectItem(at: index)
         }
-        apiKeyField.stringValue = settings.volcengineAPIKey
+        if let index = SpeechMode.allCases.firstIndex(of: settings.speechMode) {
+            speechModePopUp.selectItem(at: index)
+        }
+        setAPIKey(settings.volcengineAPIKey)
         opacitySlider.doubleValue = settings.overlayOpacity
+        fontSizeSlider.doubleValue = settings.overlayFontSize
         helperStatusField.stringValue = VolcengineHelperRuntime.diagnostic(settings: settings)
         microphoneStatusField.stringValue = audioDeviceManager.authorization.title
         reloadAudioDevices()
         updateOpacityLabel()
+        updateFontSizeLabel()
+        updateSpeechModeDetail()
         statusLabel.stringValue = ""
         renderSelectedSection()
     }
@@ -181,79 +222,6 @@ final class SettingsWindowController: NSWindowController {
         page.frame = contentContainer.bounds
         page.autoresizingMask = [.width, .height]
         contentContainer.addSubview(page)
-    }
-
-    private func appPage() -> NSView {
-        let page = pageView(title: "程序配置")
-        addLabel("悬浮窗透明度", to: page, y: 206)
-        opacitySlider.frame = NSRect(x: 148, y: 204, width: 240, height: 24)
-        page.addSubview(opacitySlider)
-        opacityValueLabel.frame = NSRect(x: 404, y: 204, width: 72, height: 22)
-        opacityValueLabel.textColor = .secondaryLabelColor
-        page.addSubview(opacityValueLabel)
-        return page
-    }
-
-    private func speechPage() -> NSView {
-        let page = pageView(title: "语音配置")
-        addLabel("语音服务", to: page, y: 224)
-        providerPopUp.frame = NSRect(x: 148, y: 220, width: 280, height: 28)
-        page.addSubview(providerPopUp)
-
-        addLabel("Resource ID", to: page, y: 176)
-        resourceValueLabel.frame = NSRect(x: 148, y: 178, width: 280, height: 22)
-        resourceValueLabel.textColor = .secondaryLabelColor
-        page.addSubview(resourceValueLabel)
-
-        addLabel("火山 API Key", to: page, y: 128)
-        apiKeyField.frame = NSRect(x: 148, y: 124, width: 280, height: 24)
-        page.addSubview(apiKeyField)
-
-        addLabel("本地 helper", to: page, y: 80)
-        helperStatusField.frame = NSRect(x: 148, y: 80, width: 340, height: 22)
-        helperStatusField.textColor = .secondaryLabelColor
-        page.addSubview(helperStatusField)
-
-        let checkButton = NSButton(title: "检查配置", target: self, action: #selector(checkConfiguration))
-        checkButton.frame = NSRect(x: 148, y: 30, width: 92, height: 30)
-        page.addSubview(checkButton)
-        return page
-    }
-
-    private func microphonePage() -> NSView {
-        let page = pageView(title: "麦克风配置")
-        addLabel("权限状态", to: page, y: 224)
-        microphoneStatusField.frame = NSRect(x: 148, y: 224, width: 280, height: 22)
-        microphoneStatusField.textColor = .secondaryLabelColor
-        page.addSubview(microphoneStatusField)
-
-        addLabel("输入设备", to: page, y: 176)
-        audioDevicePopUp.frame = NSRect(x: 148, y: 172, width: 300, height: 28)
-        page.addSubview(audioDevicePopUp)
-
-        let permissionButton = NSButton(title: "请求权限", target: self, action: #selector(requestMicrophonePermission))
-        permissionButton.frame = NSRect(x: 148, y: 116, width: 92, height: 30)
-        page.addSubview(permissionButton)
-
-        let refreshButton = NSButton(title: "刷新设备", target: self, action: #selector(refreshAudioDevices))
-        refreshButton.frame = NSRect(x: 252, y: 116, width: 92, height: 30)
-        page.addSubview(refreshButton)
-        return page
-    }
-
-    private func pageView(title: String) -> NSView {
-        let page = NSView(frame: contentContainer.bounds)
-        let titleLabel = NSTextField(labelWithString: title)
-        titleLabel.font = .boldSystemFont(ofSize: 18)
-        titleLabel.frame = NSRect(x: 0, y: 262, width: 240, height: 24)
-        page.addSubview(titleLabel)
-        return page
-    }
-
-    private func addLabel(_ title: String, to view: NSView, y: CGFloat) {
-        let label = NSTextField(labelWithString: title)
-        label.frame = NSRect(x: 0, y: y, width: 120, height: 22)
-        view.addSubview(label)
     }
 
     private func reloadAudioDevices() {
@@ -281,11 +249,21 @@ final class SettingsWindowController: NSWindowController {
         opacityValueLabel.stringValue = "\(Int(opacitySlider.doubleValue * 100))%"
     }
 
+    func updateFontSizeLabel() {
+        fontSizeValueLabel.stringValue = "\(Int(fontSizeSlider.doubleValue)) pt"
+    }
+
+    func updateSpeechModeDetail() {
+        speechModeDetailLabel.stringValue = selectedSpeechMode().detail
+    }
+
     private func currentSettings() -> AppSettings {
         AppSettings(
             speechProvider: selectedProvider(),
-            volcengineAPIKey: apiKeyField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines),
-            overlayOpacity: opacitySlider.doubleValue
+            speechMode: selectedSpeechMode(),
+            volcengineAPIKey: currentAPIKey().trimmingCharacters(in: .whitespacesAndNewlines),
+            overlayOpacity: opacitySlider.doubleValue,
+            overlayFontSize: fontSizeSlider.doubleValue
         )
     }
 
@@ -296,4 +274,13 @@ final class SettingsWindowController: NSWindowController {
         }
         return SpeechProvider.allCases[index]
     }
+
+    private func selectedSpeechMode() -> SpeechMode {
+        let index = speechModePopUp.indexOfSelectedItem
+        guard SpeechMode.allCases.indices.contains(index) else {
+            return .englishToChinese
+        }
+        return SpeechMode.allCases[index]
+    }
+
 }

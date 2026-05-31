@@ -65,3 +65,7 @@ func (o *output) send(evt helperEvent) {
 		fmt.Fprintf(os.Stderr, "encode event: %v\n", err)
 	}
 }
+
+func (o *output) logf(format string, args ...any) {
+	fmt.Fprintf(os.Stderr, format+"\n", args...)
+}

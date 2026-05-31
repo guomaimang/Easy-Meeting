@@ -163,7 +163,7 @@ func (c *astClient) handleResponse(resp *ast.TranslateResponse) bool {
 	case event.Type_TranslationSubtitleResponse, event.Type_TranslationSubtitleEnd:
 		c.out.send(c.subtitleEvent(resp, c.latestSource, resp.GetText(), true))
 	case event.Type_UsageResponse:
-		c.out.send(helperEvent{Type: "status", Message: "usage_response", Detail: resp.String()})
+		c.out.logf("usage response: status=%d message=%q", resp.GetResponseMeta().GetStatusCode(), resp.GetResponseMeta().GetMessage())
 	}
 	return false
 }
