@@ -6,7 +6,7 @@ final class OverlayWindowController: NSWindowController {
         static let minimumSize = NSSize(width: 420, height: 104)
         static let maximumSize = NSSize(width: 1280, height: 360)
         static let moveStep: CGFloat = 24
-        static let resizeStep = NSSize(width: 72, height: 24)
+        static let opacityStep: CGFloat = 0.05
     }
 
     private let overlayView = OverlayView()
@@ -18,6 +18,9 @@ final class OverlayWindowController: NSWindowController {
         get { overlayView.onToggleRecording }
         set { overlayView.onToggleRecording = newValue }
     }
+
+    /// 快捷键调整透明度后的回调，由状态栏控制器负责持久化到 UserDefaults。
+    var onOpacityChange: ((Double) -> Void)?
 
     init(settings: AppSettings = .defaults) {
         currentOpacity = CGFloat(min(max(settings.overlayOpacity, 0.1), 1))
@@ -64,8 +67,8 @@ final class OverlayWindowController: NSWindowController {
             moveDown: { [weak self] in self?.moveBy(dx: 0, dy: -Layout.moveStep) },
             moveLeft: { [weak self] in self?.moveBy(dx: -Layout.moveStep, dy: 0) },
             moveRight: { [weak self] in self?.moveBy(dx: Layout.moveStep, dy: 0) },
-            enlarge: { [weak self] in self?.resizeBy(width: Layout.resizeStep.width, height: Layout.resizeStep.height) },
-            shrink: { [weak self] in self?.resizeBy(width: -Layout.resizeStep.width, height: -Layout.resizeStep.height) },
+            increaseOpacity: { [weak self] in self?.adjustOpacity(by: Layout.opacityStep) },
+            decreaseOpacity: { [weak self] in self?.adjustOpacity(by: -Layout.opacityStep) },
             reset: { [weak self] in self?.resetFrame() }
         )
     }
@@ -121,12 +124,9 @@ final class OverlayWindowController: NSWindowController {
         show()
     }
 
-    private func resizeBy(width: CGFloat, height: CGFloat) {
-        guard let window else { return }
-        var frame = window.frame
-        frame.size.width = min(max(frame.width + width, Layout.minimumSize.width), Layout.maximumSize.width)
-        frame.size.height = min(max(frame.height + height, Layout.minimumSize.height), Layout.maximumSize.height)
-        window.setFrame(clamped(frame), display: true)
+    private func adjustOpacity(by delta: CGFloat) {
+        setOpacity(currentOpacity + delta)
+        onOpacityChange?(Double(currentOpacity))
         show()
     }
 

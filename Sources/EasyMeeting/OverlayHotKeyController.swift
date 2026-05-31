@@ -7,9 +7,9 @@ final class OverlayHotKeyController {
         case moveRight
         case moveDown
         case moveUp
-        case enlarge
-        case enlargeWithPlus
-        case shrink
+        case increaseOpacity
+        case increaseOpacityWithPlus
+        case decreaseOpacity
         case reset
     }
 
@@ -25,8 +25,8 @@ final class OverlayHotKeyController {
         moveDown: @escaping @MainActor () -> Void,
         moveLeft: @escaping @MainActor () -> Void,
         moveRight: @escaping @MainActor () -> Void,
-        enlarge: @escaping @MainActor () -> Void,
-        shrink: @escaping @MainActor () -> Void,
+        increaseOpacity: @escaping @MainActor () -> Void,
+        decreaseOpacity: @escaping @MainActor () -> Void,
         reset: @escaping @MainActor () -> Void
     ) {
         actions = [
@@ -34,9 +34,9 @@ final class OverlayHotKeyController {
             .moveDown: moveDown,
             .moveLeft: moveLeft,
             .moveRight: moveRight,
-            .enlarge: enlarge,
-            .enlargeWithPlus: enlarge,
-            .shrink: shrink,
+            .increaseOpacity: increaseOpacity,
+            .increaseOpacityWithPlus: increaseOpacity,
+            .decreaseOpacity: decreaseOpacity,
             .reset: reset
         ]
         Self.activeController = self
@@ -92,9 +92,9 @@ final class OverlayHotKeyController {
         register(.moveRight, keyCode: 124, modifiers: cmdKey)
         register(.moveDown, keyCode: 125, modifiers: cmdKey)
         register(.moveUp, keyCode: 126, modifiers: cmdKey)
-        register(.enlarge, keyCode: 24, modifiers: cmdKey)
-        register(.enlargeWithPlus, keyCode: 24, modifiers: cmdKey | shiftKey)
-        register(.shrink, keyCode: 27, modifiers: cmdKey)
+        register(.increaseOpacity, keyCode: 24, modifiers: cmdKey)
+        register(.increaseOpacityWithPlus, keyCode: 24, modifiers: cmdKey | shiftKey)
+        register(.decreaseOpacity, keyCode: 27, modifiers: cmdKey)
         register(.reset, keyCode: 29, modifiers: cmdKey)
     }
 

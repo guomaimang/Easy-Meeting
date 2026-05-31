@@ -29,6 +29,9 @@ final class StatusBarController: NSObject {
         overlayController.onToggleRecording = { [weak self] in
             self?.toggleRecording()
         }
+        overlayController.onOpacityChange = { [weak self] opacity in
+            self?.persistOpacity(opacity)
+        }
         setupStatusItem()
     }
 
@@ -38,18 +41,6 @@ final class StatusBarController: NSObject {
 
     @objc private func toggleOverlay() {
         overlayController.toggleVisibility()
-    }
-
-    @objc private func setOpacityLow() {
-        saveOpacity(0.45)
-    }
-
-    @objc private func setOpacityMedium() {
-        saveOpacity(0.72)
-    }
-
-    @objc private func setOpacityHigh() {
-        saveOpacity(0.9)
     }
 
     @objc private func quit() {
@@ -157,8 +148,6 @@ final class StatusBarController: NSObject {
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "最近会议", action: #selector(openMeetingsFolder), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(opacityMenuItem())
-        menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "退出", action: #selector(quit), keyEquivalent: "q"))
         menu.items.forEach { $0.target = self }
         statusItem.menu = menu
@@ -231,19 +220,6 @@ final class StatusBarController: NSObject {
         return item
     }
 
-    private func opacityMenuItem() -> NSMenuItem {
-        let item = NSMenuItem(title: "悬浮窗透明度", action: nil, keyEquivalent: "")
-        let submenu = NSMenu()
-
-        submenu.addItem(NSMenuItem(title: "低", action: #selector(setOpacityLow), keyEquivalent: ""))
-        submenu.addItem(NSMenuItem(title: "中", action: #selector(setOpacityMedium), keyEquivalent: ""))
-        submenu.addItem(NSMenuItem(title: "高", action: #selector(setOpacityHigh), keyEquivalent: ""))
-        submenu.items.forEach { $0.target = self }
-
-        item.submenu = submenu
-        return item
-    }
-
     private func startRecording() {
         meetingSessionController.start { [weak self] source, translation in
             self?.overlayController.showStatus(source: source, translation: translation)
@@ -260,8 +236,8 @@ final class StatusBarController: NSObject {
         }
     }
 
-    private func saveOpacity(_ opacity: Double) {
-        overlayController.setOpacity(CGFloat(opacity))
+    /// 快捷键已即时调整透明度，这里只负责写入存储，避免重复设置悬浮窗。
+    private func persistOpacity(_ opacity: Double) {
         do {
             try settingsStore.saveOverlayOpacity(opacity)
         } catch {

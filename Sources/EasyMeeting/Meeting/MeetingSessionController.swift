@@ -113,6 +113,7 @@ final class MeetingSessionController {
                 case .success:
                     self.finishMeeting(onStatus: onStatus)
                 case let .failure(error):
+                    NSLog("[会议停止] audioRecorder.stopRecording 返回失败：%@", error.localizedDescription)
                     onStatus("停止录音失败", error.localizedDescription)
                 }
 

@@ -43,7 +43,7 @@ final class AudioRecorder: NSObject {
             AVFormatIDKey: kAudioFormatMPEG4AAC,
             AVSampleRateKey: AudioStreamFormat.sampleRate,
             AVNumberOfChannelsKey: AudioStreamFormat.channels,
-            AVEncoderBitRateKey: 96_000
+            AVEncoderBitRateKey: AudioStreamFormat.aacEncoderBitRate
         ]
         let writerInput = AVAssetWriterInput(mediaType: .audio, outputSettings: settings)
         writerInput.expectsMediaDataInRealTime = true
@@ -69,6 +69,8 @@ final class AudioRecorder: NSObject {
 
     func stopRecording(completion: @escaping @Sendable (Result<Void, Error>) -> Void) {
         guard isRecording else {
+            // isRecording 在正常停止前被置 false，通常意味着录音过程中 writer 已失败
+            // （见 append 中的 failed 分支日志）。这里返回 notRecording 让上层据实报错。
             completion(.failure(AudioRecordingError.notRecording))
             return
         }
@@ -81,12 +83,11 @@ final class AudioRecorder: NSObject {
         stopCaptureOnly()
 
         // 收尾派发到 captureQueue 末尾：借串行队列的 FIFO 顺序，
-        // 保证任何在途 append 先执行完，杜绝「markAsFinished 之后又 append」
-        // 触发的写入报错——正是这个竞态导致停止成功却误报「停止录音失败」。
+        // 保证任何在途 append 先执行完，杜绝「markAsFinished 之后又 append」触发的写入报错。
         captureQueue.async {
             guard didWriteAudio else {
                 writerBox?.writer.cancelWriting()
-                NSLog("录音停止：尚未收到音频帧，跳过音频文件收尾。")
+                NSLog("[录音停止] 尚未收到音频帧，跳过音频文件收尾，按成功处理。")
                 completion(.success(()))
                 return
             }
@@ -94,6 +95,11 @@ final class AudioRecorder: NSObject {
             writerInputBox?.input.markAsFinished()
             writerBox?.writer.finishWriting {
                 if let error = writerBox?.writer.error {
+                    let nsError = error as NSError
+                    NSLog(
+                        "[录音停止] finishWriting 失败。domain=%@ code=%ld desc=%@",
+                        nsError.domain, nsError.code, nsError.localizedDescription
+                    )
                     completion(.failure(AudioRecordingError.writerFailed(error.localizedDescription)))
                 } else {
                     completion(.success(()))
@@ -174,6 +180,15 @@ extension AudioRecorder: AVCaptureAudioDataOutputSampleBufferDelegate {
         }
 
         if writer.status == .failed {
+            if isRecording {
+                let nsError = writer.error as NSError?
+                NSLog(
+                    "[录音写入] 录音过程中 writer 进入 failed，停止追加。domain=%@ code=%ld desc=%@",
+                    nsError?.domain ?? "nil",
+                    nsError?.code ?? 0,
+                    nsError?.localizedDescription ?? "nil"
+                )
+            }
             isRecording = false
             return
         }
