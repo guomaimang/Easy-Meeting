@@ -14,6 +14,58 @@ enum MeetingExporter {
         return [URL(fileURLWithPath: meeting.audioPath), markdownURL, srtURL, jsonURL]
     }
 
+    /// 导出原文与译文两份独立的 markdown，返回生成的文件 URL。
+    static func exportTranscriptMarkdown(
+        meeting: StoredMeetingSummary,
+        segments: [StoredTranscriptSegment]
+    ) throws -> [URL] {
+        let directoryURL = URL(fileURLWithPath: meeting.directoryPath, isDirectory: true)
+        let sourceURL = directoryURL.appendingPathComponent("transcript-source.md")
+        let translationURL = directoryURL.appendingPathComponent("transcript-translation.md")
+
+        try sourceMarkdown(meeting: meeting, segments: segments)
+            .write(to: sourceURL, atomically: true, encoding: .utf8)
+        try translationMarkdown(meeting: meeting, segments: segments)
+            .write(to: translationURL, atomically: true, encoding: .utf8)
+
+        return [sourceURL, translationURL]
+    }
+
+    private static func sourceMarkdown(meeting: StoredMeetingSummary, segments: [StoredTranscriptSegment]) -> String {
+        transcriptMarkdown(meeting: meeting, suffix: "原文", segments: segments) { $0.sourceText }
+    }
+
+    private static func translationMarkdown(meeting: StoredMeetingSummary, segments: [StoredTranscriptSegment]) -> String {
+        transcriptMarkdown(meeting: meeting, suffix: "译文", segments: segments) { $0.translatedText }
+    }
+
+    private static func transcriptMarkdown(
+        meeting: StoredMeetingSummary,
+        suffix: String,
+        segments: [StoredTranscriptSegment],
+        text: (StoredTranscriptSegment) -> String?
+    ) -> String {
+        var lines = [
+            "# \(meeting.title) · \(suffix)",
+            "",
+            "- 开始时间：\(meeting.startedAt)",
+            "- 结束时间：\(meeting.endedAt ?? "进行中")",
+            ""
+        ]
+
+        for segment in segments {
+            guard let content = text(segment)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  content.isEmpty == false else {
+                continue
+            }
+            lines.append("## \(timecode(milliseconds: segment.startMilliseconds))")
+            lines.append(content)
+            lines.append("")
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
     private static func markdown(meeting: StoredMeetingSummary, segments: [StoredTranscriptSegment]) -> String {
         var lines = [
             "# \(meeting.title)",

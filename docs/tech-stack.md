@@ -37,6 +37,15 @@ Easy Meeting 是一个完整的 macOS 本地会议助手产品。
 - 实时语音翻译：用于英文转中文、中英互译、粤语转中文等会议字幕场景。
 - 实时语音识别：作为备选链路，用于只需要原文转录、服务降级或翻译链路拆分时。
 
+可选接入微软 Azure 认知服务实时语音翻译：
+
+- 与火山 S2T 平级的另一条流式翻译链路，源语种 → 目标语种。
+- 通过 Node helper 子进程调用 Azure Speech SDK，协议与火山 helper 一致。
+- 需要 Speech Key 和 Region 两个凭据，详见 `docs/azure-speech.md`。
+
+AST 协议编解码与 Azure SDK 字段只允许出现在各自的 helper 基础设施层，
+方便未来替换服务商。
+
 ## 为什么选择原生 macOS
 
 原生方案对以下能力控制更稳定：

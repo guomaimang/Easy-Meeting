@@ -2,3 +2,4 @@
 .vscode/
 .DS_Store
 /ref/Meeting-Copilot-main
+/Helpers/AzureSpeechHelper/node_modules

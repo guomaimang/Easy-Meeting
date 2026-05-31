@@ -26,6 +26,9 @@ final class StatusBarController: NSObject {
         self.settingsWindowController = settingsWindowController
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
+        overlayController.onToggleRecording = { [weak self] in
+            self?.toggleRecording()
+        }
         setupStatusItem()
     }
 
@@ -113,14 +116,12 @@ final class StatusBarController: NSObject {
         rebuildMenu()
     }
 
-    @objc private func exportMeeting(_ sender: NSMenuItem) {
-        guard let meeting = sender.representedObject as? StoredMeetingSummary else { return }
-
+    @objc private func openMeetingsFolder() {
         do {
-            let urls = try meetingStore.exportMeeting(meeting)
-            overlayController.showStatus(source: "导出完成：\(urls.count) 个文件", translation: meeting.directoryPath)
+            let url = try AppStorage.meetingsURL()
+            NSWorkspace.shared.open(url)
         } catch {
-            overlayController.showStatus(source: "导出失败", translation: error.localizedDescription)
+            overlayController.showStatus(source: "打开会议文件夹失败", translation: error.localizedDescription)
         }
     }
 
@@ -131,6 +132,7 @@ final class StatusBarController: NSObject {
     }
 
     private func rebuildMenu() {
+        overlayController.setRecording(meetingSessionController.isRecording)
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "设置", action: #selector(openSettings), keyEquivalent: ","))
         menu.addItem(NSMenuItem.separator())
@@ -143,7 +145,7 @@ final class StatusBarController: NSObject {
         menu.addItem(NSMenuItem.separator())
         menu.addItem(audioMenuItem())
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(historyMenuItem())
+        menu.addItem(NSMenuItem(title: "最近会议", action: #selector(openMeetingsFolder), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(opacityMenuItem())
         menu.addItem(NSMenuItem.separator())
@@ -176,38 +178,6 @@ final class StatusBarController: NSObject {
                 deviceItem.state = device.id == audioDeviceManager.selectedDeviceID ? .on : .off
                 submenu.addItem(deviceItem)
             }
-        }
-
-        submenu.items.forEach { $0.target = self }
-        item.submenu = submenu
-        return item
-    }
-
-    private func historyMenuItem() -> NSMenuItem {
-        let item = NSMenuItem(title: "最近会议", action: nil, keyEquivalent: "")
-        let submenu = NSMenu()
-
-        do {
-            let meetings = try meetingStore.recentMeetings()
-            if meetings.isEmpty {
-                let emptyItem = NSMenuItem(title: "暂无会议记录", action: nil, keyEquivalent: "")
-                emptyItem.isEnabled = false
-                submenu.addItem(emptyItem)
-            } else {
-                meetings.forEach { meeting in
-                    let menuItem = NSMenuItem(
-                        title: "\(meeting.startedAt)  \(meeting.title)",
-                        action: #selector(exportMeeting),
-                        keyEquivalent: ""
-                    )
-                    menuItem.representedObject = meeting
-                    submenu.addItem(menuItem)
-                }
-            }
-        } catch {
-            let errorItem = NSMenuItem(title: "读取历史失败", action: nil, keyEquivalent: "")
-            errorItem.isEnabled = false
-            submenu.addItem(errorItem)
         }
 
         submenu.items.forEach { $0.target = self }

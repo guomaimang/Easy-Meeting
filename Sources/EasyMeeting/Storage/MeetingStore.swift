@@ -88,6 +88,29 @@ final class MeetingStore {
         return try MeetingExporter.export(meeting: meeting, segments: segments)
     }
 
+    /// 会议正常结束时导出原文与译文两份 markdown。
+    func exportTranscriptMarkdown(for meeting: MeetingRecord) throws -> [URL] {
+        if let initializationError {
+            throw initializationError
+        }
+
+        let summary = Self.summary(from: meeting)
+        let segments = try database?.fetchTranscriptSegments(meetingID: meeting.id) ?? []
+        return try MeetingExporter.exportTranscriptMarkdown(meeting: summary, segments: segments)
+    }
+
+    private static func summary(from meeting: MeetingRecord) -> StoredMeetingSummary {
+        let formatter = ISO8601DateFormatter()
+        return StoredMeetingSummary(
+            id: meeting.id,
+            title: meeting.title,
+            startedAt: formatter.string(from: meeting.startedAt),
+            endedAt: meeting.endedAt.map(formatter.string(from:)),
+            directoryPath: meeting.directoryURL.path,
+            audioPath: meeting.audioURL.path
+        )
+    }
+
     private func writeMetadata(for meeting: MeetingRecord) throws {
         let metadata = MeetingMetadata(
             id: meeting.id.uuidString,

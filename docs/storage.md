@@ -95,10 +95,10 @@ Core Data：
 - 已创建 `meetings` 表。
 - 已创建 `transcript_segments` 表。
 - 开始录音时写入会议记录。
-- 停止录音时更新结束时间。
+- 停止录音时更新结束时间，并自动导出原文与译文两份 markdown（`transcript-source.md`、`transcript-translation.md`）到会议目录。异常退出（崩溃/强制退出）不会走停止流程，因此不触发导出。
 - 录音文件、原文文本、译文文本和 `metadata.json` 已保存到用户文稿目录下的会议目录。
-- 菜单栏可读取 `meetings` 表并展示最近会议。
-- 点击最近会议会生成/刷新 `transcript.md`、`transcript.srt` 和 `transcript.json`。
+- 菜单栏「最近会议」直接在 Finder 中打开会议根目录（用户文稿目录下的 `Easy Meeting/Meetings`），不再展开会议列表。
+- `MeetingExporter` 提供原文/译文 markdown 导出，以及保留的 `transcript.srt`、`transcript.json` 全量导出能力。
 - `exports` 表会在导出功能落地时创建。
 
 ## 索引

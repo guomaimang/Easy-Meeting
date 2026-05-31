@@ -122,7 +122,18 @@ final class MeetingSessionController {
     private func finishMeeting(onStatus: @escaping @MainActor (String, String) -> Void) {
         do {
             let meeting = try meetingStore.finishCurrentMeeting()
-            onStatus("录音已保存", meeting?.directoryURL.path ?? "会议目录已更新")
+            guard let meeting else {
+                onStatus("录音已保存", "会议目录已更新")
+                return
+            }
+
+            do {
+                let urls = try meetingStore.exportTranscriptMarkdown(for: meeting)
+                let fileNames = urls.map { $0.lastPathComponent }.joined(separator: "、")
+                onStatus("录音已保存，已导出：\(fileNames)", meeting.directoryURL.path)
+            } catch {
+                onStatus("录音已保存，markdown 导出失败", error.localizedDescription)
+            }
         } catch {
             onStatus("会议保存失败", error.localizedDescription)
         }

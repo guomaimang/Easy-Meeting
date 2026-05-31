@@ -9,7 +9,16 @@ final class OverlayView: NSView {
         }
     }
     var onDrag: ((OverlayDragGesture) -> Void)?
+    var onToggleRecording: (() -> Void)?
 
+    /// 录音状态，转发给角落按钮切换三角 / 方块图标。
+    var isRecording: Bool = false {
+        didSet {
+            recordButton.isRecording = isRecording
+        }
+    }
+
+    private let recordButton = OverlayRecordButton()
     private let sourceScrollView = OverlayScrollView()
     private let translationScrollView = OverlayScrollView()
     private let sourceContentView = OverlayContentView()
@@ -40,7 +49,13 @@ final class OverlayView: NSView {
     }
 
     override func hitTest(_ point: NSPoint) -> NSView? {
-        bounds.contains(point) ? self : nil
+        guard bounds.contains(point) else { return nil }
+        // 录音按钮优先接收点击，其余区域留给拖拽 / 缩放。
+        let pointInButton = convert(point, to: recordButton)
+        if recordButton.bounds.contains(pointInButton) {
+            return recordButton
+        }
+        return self
     }
 
     func update(source: String, translation: String) {
@@ -115,6 +130,10 @@ final class OverlayView: NSView {
         let gap: CGFloat = 18
         let viewport = bounds.insetBy(dx: inset, dy: inset)
 
+        // 录音按钮固定在左上角内边距区域，避开字幕文字。
+        let buttonSize: CGFloat = 14
+        recordButton.frame = NSRect(x: inset / 2, y: inset / 2, width: buttonSize, height: buttonSize)
+
         let columnWidth = max((viewport.width - gap) / 2, 120)
         let sourceHeight = max(sourceLabel.heightFor(width: columnWidth), viewport.height)
         let translationHeight = max(translationLabel.heightFor(width: columnWidth), viewport.height)
@@ -158,6 +177,11 @@ final class OverlayView: NSView {
         addSubview(sourceScrollView)
         addSubview(separatorView)
         addSubview(translationScrollView)
+
+        recordButton.onToggle = { [weak self] in
+            self?.onToggleRecording?()
+        }
+        addSubview(recordButton)
     }
 
     private func setupScrollView(_ scrollView: OverlayScrollView, contentView: OverlayContentView) {

@@ -156,6 +156,7 @@ func (c *astClient) handleResponse(resp *ast.TranslateResponse) bool {
 		return true
 	case event.Type_SourceSubtitleStart:
 		c.currentSource = ""
+		c.logSubtitleEvent("source_start", resp)
 		c.out.send(c.subtitleEvent("source_start", resp, "", false))
 	case event.Type_SourceSubtitleResponse, event.Type_SourceSubtitleEnd:
 		c.currentSource = mergeSubtitleText(c.currentSource, resp.GetText())
@@ -163,10 +164,12 @@ func (c *astClient) handleResponse(resp *ast.TranslateResponse) bool {
 		if resp.GetEvent() == event.Type_SourceSubtitleEnd {
 			eventType = "source_end"
 		}
+		c.logSubtitleEvent(eventType, resp)
 		c.out.send(c.subtitleEvent(eventType, resp, c.currentSource, false))
 	case event.Type_TranslationSubtitleStart:
 		c.currentTarget = ""
 		c.finalEmitted = false
+		c.logSubtitleEvent("translation_start", resp)
 		c.out.send(c.subtitleEvent("translation_start", resp, "", false))
 	case event.Type_TranslationSubtitleResponse, event.Type_TranslationSubtitleEnd:
 		c.currentTarget = mergeSubtitleText(c.currentTarget, resp.GetText())
@@ -176,11 +179,22 @@ func (c *astClient) handleResponse(resp *ast.TranslateResponse) bool {
 			eventType = "translation_end"
 			isFinal = c.consumeFinalIfReady()
 		}
+		c.logSubtitleEvent(eventType, resp)
 		c.out.send(c.subtitleEvent(eventType, resp, c.currentTarget, isFinal))
 	case event.Type_UsageResponse:
 		c.out.logf("usage response: status=%d message=%q", resp.GetResponseMeta().GetStatusCode(), resp.GetResponseMeta().GetMessage())
 	}
 	return false
+}
+
+func (c *astClient) logSubtitleEvent(eventType string, resp *ast.TranslateResponse) {
+	c.out.logf(
+		"subtitle event: type=%s text_len=%d start=%d end=%d",
+		eventType,
+		len([]rune(resp.GetText())),
+		resp.GetStartTime(),
+		resp.GetEndTime(),
+	)
 }
 
 func (c *astClient) consumeFinalIfReady() bool {

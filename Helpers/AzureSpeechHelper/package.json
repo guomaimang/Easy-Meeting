@@ -1,0 +1,17 @@
+{
+  "name": "easy-meeting-azure-speech-helper",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Easy Meeting 的 Azure 流式翻译 helper，通过 stdin/stdout JSON Lines 与 Swift 主 App 通信",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "microsoft-cognitiveservices-speech-sdk": "1.50.0"
+  }
+}

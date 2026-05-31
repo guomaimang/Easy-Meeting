@@ -13,6 +13,12 @@ final class OverlayWindowController: NSWindowController {
     private var hotKeyController: OverlayHotKeyController?
     private var currentOpacity: CGFloat
 
+    /// 悬浮窗角落录音按钮的点击回调，由状态栏控制器接管录音切换。
+    var onToggleRecording: (() -> Void)? {
+        get { overlayView.onToggleRecording }
+        set { overlayView.onToggleRecording = newValue }
+    }
+
     init(settings: AppSettings = .defaults) {
         currentOpacity = CGFloat(min(max(settings.overlayOpacity, 0.25), 1))
 
@@ -90,6 +96,11 @@ final class OverlayWindowController: NSWindowController {
 
     func setFontSize(_ fontSize: CGFloat) {
         overlayView.fontSize = min(max(fontSize, 14), 34)
+    }
+
+    /// 同步录音状态到角落按钮，切换三角 / 方块图标。
+    func setRecording(_ isRecording: Bool) {
+        overlayView.isRecording = isRecording
     }
 
     func showReadyStatus() {
