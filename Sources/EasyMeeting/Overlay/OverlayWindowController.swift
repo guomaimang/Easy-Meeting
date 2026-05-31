@@ -2,8 +2,8 @@ import AppKit
 
 final class OverlayWindowController: NSWindowController {
     private enum Layout {
-        static let defaultSize = NSSize(width: 760, height: 156)
-        static let minimumSize = NSSize(width: 420, height: 104)
+        static let defaultSize = NSSize(width: 760, height: 184)
+        static let minimumSize = NSSize(width: 420, height: 140)
         static let maximumSize = NSSize(width: 1280, height: 360)
         static let moveStep: CGFloat = 24
         static let opacityStep: CGFloat = 0.05
@@ -13,10 +13,16 @@ final class OverlayWindowController: NSWindowController {
     private var hotKeyController: OverlayHotKeyController?
     private var currentOpacity: CGFloat
 
-    /// 悬浮窗角落录音按钮的点击回调，由状态栏控制器接管录音切换。
+    /// 悬浮窗顶栏录音按钮的点击回调，由状态栏控制器接管录音切换。
     var onToggleRecording: (() -> Void)? {
         get { overlayView.onToggleRecording }
         set { overlayView.onToggleRecording = newValue }
+    }
+
+    /// 悬浮窗顶栏麦克风下拉的选择回调，回传设备 ID，由状态栏控制器走切麦逻辑。
+    var onSelectDevice: ((String) -> Void)? {
+        get { overlayView.onSelectDevice }
+        set { overlayView.onSelectDevice = newValue }
     }
 
     /// 快捷键调整透明度后的回调，由状态栏控制器负责持久化到 UserDefaults。
@@ -101,9 +107,14 @@ final class OverlayWindowController: NSWindowController {
         overlayView.fontSize = min(max(fontSize, 14), 34)
     }
 
-    /// 同步录音状态到角落按钮，切换三角 / 方块图标。
+    /// 同步录音状态到顶栏按钮，切换三角 / 方块图标。
     func setRecording(_ isRecording: Bool) {
         overlayView.isRecording = isRecording
+    }
+
+    /// 刷新顶栏麦克风下拉的设备列表与选中项。
+    func updateDevices(_ devices: [AudioInputDevice], selectedID: String?) {
+        overlayView.updateDevices(devices, selectedID: selectedID)
     }
 
     func showReadyStatus() {

@@ -29,6 +29,9 @@ final class StatusBarController: NSObject {
         overlayController.onToggleRecording = { [weak self] in
             self?.toggleRecording()
         }
+        overlayController.onSelectDevice = { [weak self] deviceID in
+            self?.switchMicrophone(to: deviceID)
+        }
         overlayController.onOpacityChange = { [weak self] opacity in
             self?.persistOpacity(opacity)
         }
@@ -73,11 +76,15 @@ final class StatusBarController: NSObject {
 
     @objc private func selectAudioDevice(_ sender: NSMenuItem) {
         guard let deviceID = sender.representedObject as? String else { return }
-        audioDeviceManager.selectDevice(id: deviceID)
-        overlayController.showStatus(
-            source: "已选择麦克风",
-            translation: audioDeviceManager.selectedDeviceName()
-        )
+        switchMicrophone(to: deviceID)
+    }
+
+    /// 切换麦克风的统一入口：菜单栏麦克风项与悬浮窗下拉共用。
+    /// 录音中走热切换（识别与字幕不中断），未录音仅记录选择。
+    private func switchMicrophone(to deviceID: String) {
+        meetingSessionController.switchMicrophone(to: deviceID) { [weak self] source, translation in
+            self?.overlayController.showStatus(source: source, translation: translation)
+        }
         rebuildMenu()
     }
 
@@ -134,6 +141,10 @@ final class StatusBarController: NSObject {
 
     private func rebuildMenu() {
         overlayController.setRecording(meetingSessionController.recordingState.isRecordingVisible)
+        overlayController.updateDevices(
+            audioDeviceManager.devices,
+            selectedID: audioDeviceManager.selectedDeviceID
+        )
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "设置", action: #selector(openSettings), keyEquivalent: ","))
         menu.addItem(NSMenuItem.separator())

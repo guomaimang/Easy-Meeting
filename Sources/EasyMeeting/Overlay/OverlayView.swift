@@ -1,6 +1,15 @@
 import AppKit
 
 final class OverlayView: NSView {
+    private enum Layout {
+        static let horizontalInset: CGFloat = 18
+        static let topMargin: CGFloat = 8
+        static let toolbarHeight: CGFloat = 26
+        static let toolbarGap: CGFloat = 10
+        static let bottomInset: CGFloat = 18
+        static let columnGap: CGFloat = 18
+    }
+
     var opacity: CGFloat = 0.82
     var fontSize: CGFloat = 22 {
         didSet {
@@ -9,16 +18,23 @@ final class OverlayView: NSView {
         }
     }
     var onDrag: ((OverlayDragGesture) -> Void)?
-    var onToggleRecording: (() -> Void)?
+    var onToggleRecording: (() -> Void)? {
+        get { toolbar.onToggleRecording }
+        set { toolbar.onToggleRecording = newValue }
+    }
+    var onSelectDevice: ((String) -> Void)? {
+        get { toolbar.onSelectDevice }
+        set { toolbar.onSelectDevice = newValue }
+    }
 
-    /// 录音状态，转发给角落按钮切换三角 / 方块图标。
+    /// 录音状态，转发给顶栏切换三角 / 方块图标。
     var isRecording: Bool = false {
         didSet {
-            recordButton.isRecording = isRecording
+            toolbar.isRecording = isRecording
         }
     }
 
-    private let recordButton = OverlayRecordButton()
+    private let toolbar = OverlayToolbarView()
     private let sourceScrollView = OverlayScrollView()
     private let translationScrollView = OverlayScrollView()
     private let sourceContentView = OverlayContentView()
@@ -29,6 +45,8 @@ final class OverlayView: NSView {
     private var dragStartLocation: NSPoint?
     private var dragStartFrame: NSRect?
     private var dragEdges: OverlayResizeEdges = []
+
+    // PLACEHOLDER_BODY
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -50,12 +68,13 @@ final class OverlayView: NSView {
 
     override func hitTest(_ point: NSPoint) -> NSView? {
         // hitTest 传入的 point 处于父视图坐标系，而本视图 isFlipped=true，
-        // 必须先换算到自身坐标系，否则左上角录音按钮的命中区会被算到别处。
+        // 必须先换算到自身坐标系，否则顶栏控件的命中区会被算到别处。
         let local = superview.map { convert(point, from: $0) } ?? point
         guard bounds.contains(local) else { return nil }
-        // 录音按钮优先接收点击，其余区域留给拖拽 / 缩放。
-        if recordButton.frame.contains(local) {
-            return recordButton
+        // 顶栏区域交给子控件（录音按钮 / 麦克风下拉）接收点击，其余区域留给拖拽 / 缩放。
+        // hitTest 接收的是「相对接收者父视图」坐标，toolbar 父视图即本视图，故直接传 local。
+        if toolbar.frame.contains(local) {
+            return toolbar.hitTest(local) ?? self
         }
         return self
     }
@@ -75,6 +94,11 @@ final class OverlayView: NSView {
                 translationScrollView.scrollToBottom()
             }
         }
+    }
+
+    /// 刷新顶栏麦克风下拉。
+    func updateDevices(_ devices: [AudioInputDevice], selectedID: String?) {
+        toolbar.updateDevices(devices, selectedID: selectedID)
     }
 
     override func scrollWheel(with event: NSEvent) {
@@ -117,8 +141,7 @@ final class OverlayView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
 
-        let backgroundRect = bounds.insetBy(dx: 0, dy: 0)
-        let path = NSBezierPath(roundedRect: backgroundRect, xRadius: 8, yRadius: 8)
+        let path = NSBezierPath(roundedRect: bounds, xRadius: 8, yRadius: 8)
         NSColor.black.withAlphaComponent(opacity).setFill()
         path.fill()
 
@@ -130,34 +153,40 @@ final class OverlayView: NSView {
     override func layout() {
         super.layout()
 
-        let inset: CGFloat = 18
-        let gap: CGFloat = 18
-        let viewport = bounds.insetBy(dx: inset, dy: inset)
+        // 顶部留 margin 后放置工具栏，字幕区下移到工具栏之下。
+        toolbar.frame = NSRect(
+            x: Layout.horizontalInset,
+            y: Layout.topMargin,
+            width: max(bounds.width - Layout.horizontalInset * 2, 0),
+            height: Layout.toolbarHeight
+        )
 
-        // 录音按钮固定在左上角内边距区域，避开字幕文字。
-        let buttonSize: CGFloat = 24
-        recordButton.frame = NSRect(x: inset / 2, y: inset / 2, width: buttonSize, height: buttonSize)
+        let contentTop = Layout.topMargin + Layout.toolbarHeight + Layout.toolbarGap
+        let contentHeight = max(bounds.height - contentTop - Layout.bottomInset, 0)
+        let contentLeft = Layout.horizontalInset
+        let contentWidth = max(bounds.width - Layout.horizontalInset * 2, 0)
 
-        let columnWidth = max((viewport.width - gap) / 2, 120)
-        let sourceHeight = max(sourceLabel.heightFor(width: columnWidth), viewport.height)
-        let translationHeight = max(translationLabel.heightFor(width: columnWidth), viewport.height)
+        let gap = Layout.columnGap
+        let columnWidth = max((contentWidth - gap) / 2, 120)
+        let sourceHeight = max(sourceLabel.heightFor(width: columnWidth), contentHeight)
+        let translationHeight = max(translationLabel.heightFor(width: columnWidth), contentHeight)
 
-        sourceScrollView.frame = NSRect(x: viewport.minX, y: viewport.minY, width: columnWidth, height: viewport.height)
+        sourceScrollView.frame = NSRect(x: contentLeft, y: contentTop, width: columnWidth, height: contentHeight)
         translationScrollView.frame = NSRect(
-            x: viewport.minX + columnWidth + gap,
-            y: viewport.minY,
+            x: contentLeft + columnWidth + gap,
+            y: contentTop,
             width: columnWidth,
-            height: viewport.height
+            height: contentHeight
         )
         sourceContentView.frame = NSRect(x: 0, y: 0, width: columnWidth, height: sourceHeight)
         translationContentView.frame = NSRect(x: 0, y: 0, width: columnWidth, height: translationHeight)
         sourceLabel.frame = NSRect(x: 0, y: 0, width: columnWidth, height: sourceHeight)
         translationLabel.frame = NSRect(x: 0, y: 0, width: columnWidth, height: translationHeight)
         separatorView.frame = NSRect(
-            x: viewport.minX + columnWidth + gap / 2,
-            y: viewport.minY,
+            x: contentLeft + columnWidth + gap / 2,
+            y: contentTop,
             width: 1,
-            height: viewport.height
+            height: contentHeight
         )
     }
 
@@ -181,11 +210,7 @@ final class OverlayView: NSView {
         addSubview(sourceScrollView)
         addSubview(separatorView)
         addSubview(translationScrollView)
-
-        recordButton.onToggle = { [weak self] in
-            self?.onToggleRecording?()
-        }
-        addSubview(recordButton)
+        addSubview(toolbar)
     }
 
     private func setupScrollView(_ scrollView: OverlayScrollView, contentView: OverlayContentView) {
@@ -235,34 +260,6 @@ struct OverlayDragGesture {
     let resizeEdges: OverlayResizeEdges
 }
 
-private final class OverlayScrollView: NSScrollView {
-    private let bottomTolerance: CGFloat = 6
-
-    var isPinnedToBottom: Bool {
-        guard let documentView else { return true }
-        let maxY = max(documentView.bounds.height - contentView.bounds.height, 0)
-        return contentView.bounds.origin.y >= maxY - bottomTolerance
-    }
-
-    override func scrollWheel(with event: NSEvent) {
-        super.scrollWheel(with: event)
-        reflectScrolledClipView(contentView)
-    }
-
-    func scrollToBottom() {
-        guard let documentView else { return }
-        let maxY = max(documentView.bounds.height - contentView.bounds.height, 0)
-        contentView.scroll(to: NSPoint(x: 0, y: maxY))
-        reflectScrolledClipView(contentView)
-    }
-}
-
-private final class OverlayContentView: NSView {
-    override var isFlipped: Bool {
-        true
-    }
-}
-
 private extension NSTextField {
     func heightFor(width: CGFloat) -> CGFloat {
         guard width > 0 else { return 0 }
@@ -270,3 +267,4 @@ private extension NSTextField {
         return ceil(cell?.cellSize(forBounds: NSRect(origin: .zero, size: size)).height ?? 0)
     }
 }
+

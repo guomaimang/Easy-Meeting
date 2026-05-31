@@ -2,31 +2,46 @@
 
 Easy Meeting 的透明悬浮窗，常驻桌面显示实时原文与译文。
 
+代码位于 `Sources/EasyMeeting/Overlay/`。
+
 ## 结构
 
 - `OverlayWindowController`：管理 `NSPanel`、位置 / 尺寸 / 透明度、快捷键、对外接口。
-- `OverlayView`：绘制背景与两栏字幕（左原文、右译文），处理拖拽与缩放。
-- `OverlayRecordButton`：角落录音开关按钮。
+- `OverlayView`：布局顶栏与两栏字幕（左原文、右译文），处理拖拽与缩放。
+- `OverlayToolbarView`：顶部工具栏，承载录音按钮与麦克风下拉。
+- `OverlayRecordButton`：录音开关按钮。
+- `OverlayScrollView`：字幕滚动视图，支持「贴底自动跟随」。
+
+## 顶部工具栏
+
+悬浮窗顶部常驻一条工具栏，上方留 8pt margin，与下方字幕区分隔。无需打开菜单栏即可控制录音与切换麦克风。
+
+- 左侧：录音开关按钮。
+- 紧邻按钮：麦克风下拉（`NSPopUpButton`，深色外观融入半透明 HUD）。
+- 工具栏区域交给子控件接收点击（见 `OverlayView.hitTest`），其余区域仍归窗口拖拽 / 缩放，并允许非激活悬浮窗的首次点击直接触发。
+
+### 麦克风下拉
+
+- 下拉项与菜单栏「麦克风」子菜单共享 `AudioDeviceManager` 状态，选中项实时同步。
+- 录音中切换走热切换路径，识别与字幕不中断，详见 `docs/audio-hot-swap.md`。
+- 未录音时切换仅记录选择，下次开始录音生效。
 
 ## 录音开关按钮
-
-悬浮窗左上角内边距处常驻一个录音按钮，无需打开菜单栏即可控制录音。
 
 - 待机：白色播放三角，点击开始录音。
 - 录音中：红色方块，点击停止录音。
 - 启动中 / 停止中：保持当前可见图标，不重复提交开始或停止请求，只提示当前操作正在进行。
 - 按钮使用 24pt 点击热区和 14pt 图标，保证小按钮可点中。
-- 按钮区域单独接收点击，不触发窗口拖拽 / 缩放（见 `OverlayView.hitTest`），并允许非激活悬浮窗的首次点击直接触发。
 
 ### 状态流转
 
 ```
-点击按钮 → OverlayView.onToggleRecording
+点击按钮 → OverlayToolbarView.onToggleRecording
         → OverlayWindowController.onToggleRecording
         → StatusBarController.toggleRecording
         → MeetingSessionController.start / stop
         → rebuildMenu → OverlayWindowController.setRecording
-        → OverlayRecordButton.isRecording → 切换三角 / 方块
+        → OverlayToolbarView.isRecording → 切换三角 / 方块
 ```
 
 录音状态由 `MeetingSessionController.recordingState` 统一管理，菜单栏"开始 / 停止录音"项与悬浮窗按钮共用同一套切换逻辑，状态保持一致。

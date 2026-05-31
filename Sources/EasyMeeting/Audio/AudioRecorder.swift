@@ -13,7 +13,7 @@ final class AudioRecorder: NSObject {
     func startRecording(to url: URL, selectedDeviceID: String?) throws {
         stopCaptureOnly()
 
-        let device = try selectedCaptureDevice(id: selectedDeviceID)
+        let device = try Self.captureDevice(id: selectedDeviceID)
         let input = try AVCaptureDeviceInput(device: device)
         let output = AVCaptureAudioDataOutput()
         let session = AVCaptureSession()
@@ -64,6 +64,63 @@ final class AudioRecorder: NSObject {
 
         captureQueue.async {
             session.startRunning()
+        }
+    }
+
+    /// 会议进行中热切换麦克风：在 captureQueue 上事务式替换 AVCaptureSession 的 input，
+    /// 不触碰 output / delegate / onAudioFrame / writer，下游识别与录音文件连续不断。
+    /// AVCaptureSession.inputs 自身即当前 input 的事实来源，无需在外另存引用；
+    /// 整个临界区在 captureQueue 上串行执行，既与音频帧 append 互不交叉，
+    /// 也避免快速连点导致的双重替换竞态。详见 docs/audio-hot-swap.md。
+    func switchDevice(
+        to selectedDeviceID: String?,
+        completion: @escaping @Sendable (Result<Void, Error>) -> Void
+    ) {
+        guard isRecording, let session else {
+            completion(.failure(AudioRecordingError.notRecording))
+            return
+        }
+
+        let sessionBox = CaptureSessionBox(session: session)
+        let deviceID = selectedDeviceID
+
+        captureQueue.async {
+            let session = sessionBox.session
+            guard let oldInput = session.inputs.first as? AVCaptureDeviceInput else {
+                completion(.failure(AudioRecordingError.notRecording))
+                return
+            }
+
+            let newInput: AVCaptureDeviceInput
+            do {
+                let device = try Self.captureDevice(id: deviceID)
+                // 已是同一设备则无需切换，避免无谓的事务与瞬时静音。
+                if device.uniqueID == oldInput.device.uniqueID {
+                    completion(.success(()))
+                    return
+                }
+                newInput = try AVCaptureDeviceInput(device: device)
+            } catch {
+                NSLog("[麦克风切换] 创建新输入失败，session 保持不动：%@", error.localizedDescription)
+                completion(.failure(error))
+                return
+            }
+
+            session.beginConfiguration()
+            session.removeInput(oldInput)
+
+            if session.canAddInput(newInput) {
+                session.addInput(newInput)
+                session.commitConfiguration()
+                NSLog("[麦克风切换] 成功切换到设备：%@", newInput.device.localizedName)
+                completion(.success(()))
+            } else {
+                // 新设备无法加入，回滚旧 input 保证录音继续。
+                session.addInput(oldInput)
+                session.commitConfiguration()
+                NSLog("[麦克风切换] 新设备无法加入，已回滚旧设备。")
+                completion(.failure(AudioRecordingError.cannotAddInput))
+            }
         }
     }
 
@@ -119,7 +176,7 @@ final class AudioRecorder: NSObject {
         onAudioFrame = nil
     }
 
-    private func selectedCaptureDevice(id selectedDeviceID: String?) throws -> AVCaptureDevice {
+    private static func captureDevice(id selectedDeviceID: String?) throws -> AVCaptureDevice {
         let discoverySession = AVCaptureDevice.DiscoverySession(
             deviceTypes: [.microphone, .external],
             mediaType: .audio,
@@ -136,22 +193,6 @@ final class AudioRecorder: NSObject {
         }
 
         throw AudioRecordingError.deviceNotFound
-    }
-}
-
-private final class AssetWriterBox: @unchecked Sendable {
-    let writer: AVAssetWriter
-
-    init(writer: AVAssetWriter) {
-        self.writer = writer
-    }
-}
-
-private final class AssetWriterInputBox: @unchecked Sendable {
-    let input: AVAssetWriterInput
-
-    init(input: AVAssetWriterInput) {
-        self.input = input
     }
 }
 

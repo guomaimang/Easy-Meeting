@@ -123,6 +123,38 @@ final class MeetingSessionController {
         }
     }
 
+    /// 切换麦克风。录音中走热切换：替换采集设备但不重建识别会话、不动录音文件与字幕缓冲，
+    /// 字幕与转录连续不断（详见 docs/audio-hot-swap.md）；未录音时仅记录选择，下次开始录音生效。
+    func switchMicrophone(
+        to deviceID: String,
+        onStatus: @escaping @MainActor (String, String) -> Void
+    ) {
+        let previousDeviceID = audioDeviceManager.selectedDeviceID
+        audioDeviceManager.selectDevice(id: deviceID)
+        let deviceName = audioDeviceManager.selectedDeviceName()
+
+        guard recordingState == .recording else {
+            onStatus("已选择麦克风", deviceName)
+            return
+        }
+
+        audioRecorder.switchDevice(to: deviceID) { [weak self] result in
+            Task { @MainActor in
+                switch result {
+                case .success:
+                    onStatus("已切换麦克风：\(deviceName)", "识别与录音未中断")
+                case let .failure(error):
+                    // 热切换失败，录音仍在旧设备上继续，回滚选中项保持一致。
+                    if let previousDeviceID {
+                        self?.audioDeviceManager.selectDevice(id: previousDeviceID)
+                    }
+                    NSLog("[会议切麦] audioRecorder.switchDevice 失败：%@", error.localizedDescription)
+                    onStatus("切换麦克风失败", "已保持当前麦克风继续录音：\(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
     /// App 退出时的兜底清理：无视录音状态，立即停掉语音 helper，
     /// 避免主进程消失后留下残留的 helper 子进程。详见 docs/azure-speech.md。
     func shutdownForAppTermination() {

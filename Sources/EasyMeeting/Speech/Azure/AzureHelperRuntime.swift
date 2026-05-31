@@ -11,11 +11,25 @@ enum AzureHelperRuntime {
         }
     }
 
-    /// 定位系统 node 可执行文件。
+    /// 定位 node 可执行文件：优先包内内置 Node（分发包），再回退系统 Node（开发态）。
     static func nodeURL() -> URL? {
-        nodeCandidatePaths()
-            .map { URL(fileURLWithPath: $0) }
-            .first { FileManager.default.isExecutableFile(atPath: $0.path) }
+        let candidates = bundledNodeURLs()
+            + nodeCandidatePaths().map { URL(fileURLWithPath: $0) }
+        return candidates.first { FileManager.default.isExecutableFile(atPath: $0.path) }
+    }
+
+    /// 分发包内置的 Node 候选位置：`Contents/Helpers/node`。
+    /// 开发包内不含此文件，自动回退到系统 Node，两种场景互不影响。
+    private static func bundledNodeURLs() -> [URL] {
+        var urls: [URL] = []
+        urls.append(Bundle.main.bundleURL
+            .appendingPathComponent("Contents")
+            .appendingPathComponent("Helpers")
+            .appendingPathComponent("node"))
+        if let executableDirectory = Bundle.main.executableURL?.deletingLastPathComponent() {
+            urls.append(executableDirectory.appendingPathComponent("node"))
+        }
+        return urls
     }
 
     static func diagnostic(settings: AppSettings) -> String {
@@ -34,6 +48,15 @@ enum AzureHelperRuntime {
     private static func candidateURLs() -> [URL] {
         var urls: [URL] = []
 
+        // 分发包：放在 Contents/Resources/，避免 codesign 把含 package.json 的
+        // node 目录误判为嵌套 bundle。
+        urls.append(Bundle.main.bundleURL
+            .appendingPathComponent("Contents")
+            .appendingPathComponent("Resources")
+            .appendingPathComponent(helperDirectoryName)
+            .appendingPathComponent(scriptName))
+
+        // 开发组装包：放在 Contents/Helpers/（package-app.sh，不签名）。
         urls.append(Bundle.main.bundleURL
             .appendingPathComponent("Contents")
             .appendingPathComponent("Helpers")
