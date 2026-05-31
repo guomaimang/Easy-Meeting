@@ -31,13 +31,14 @@ final class AzureHelperSpeechClient: SpeechClient, @unchecked Sendable {
             return
         }
 
-        let validation = AzureLanguageMapping.validate(configuration)
-        guard validation.isValid,
-              let sourceCode = AzureLanguageMapping.recognitionCode(for: configuration.sourceLanguage),
-              let targetCode = AzureLanguageMapping.translationCode(for: configuration.targetLanguage) else {
+        let validation = configuration.validation
+        guard validation.isValid else {
             emitStatus("Azure 语种不支持", validation.message ?? "请更换源语种或目标语种。")
             return
         }
+        // 配置里的代号已经是 Azure 原生识别码/翻译码，直接透传
+        let sourceCode = configuration.sourceCode
+        let targetCode = configuration.targetCode
         sourceLanguageCode = sourceCode
         targetLanguageCode = targetCode
 

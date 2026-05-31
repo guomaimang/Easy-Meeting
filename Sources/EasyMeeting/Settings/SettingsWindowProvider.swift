@@ -8,8 +8,8 @@ extension SettingsWindowController {
         return AppSettings(
             speechProvider: selectedProvider(),
             speechMode: selectedSpeechMode(),
-            speechSourceLanguage: selectedSourceLanguage(),
-            speechTargetLanguage: selectedTargetLanguage(),
+            speechSourceLanguage: selectedSourceCode(),
+            speechTargetLanguage: selectedTargetCode(),
             volcengineAPIKey: volcengineKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines),
             azureSpeechKey: azureKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines),
             azureSpeechRegion: regionField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines),

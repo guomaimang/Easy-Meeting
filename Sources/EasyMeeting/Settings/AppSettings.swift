@@ -5,8 +5,8 @@ struct AppSettings {
 
     var speechProvider: SpeechProvider
     var speechMode: SpeechMode
-    var speechSourceLanguage: SpeechLanguage
-    var speechTargetLanguage: SpeechLanguage
+    var speechSourceLanguage: String
+    var speechTargetLanguage: String
     var volcengineAPIKey: String
     var azureSpeechKey: String
     var azureSpeechRegion: String
@@ -16,8 +16,8 @@ struct AppSettings {
     static let defaults = AppSettings(
         speechProvider: .volcengine,
         speechMode: .englishToChinese,
-        speechSourceLanguage: .en,
-        speechTargetLanguage: .zh,
+        speechSourceLanguage: "en",
+        speechTargetLanguage: "zh",
         volcengineAPIKey: "",
         azureSpeechKey: "",
         azureSpeechRegion: "",
@@ -27,8 +27,9 @@ struct AppSettings {
 
     var speechConfiguration: SpeechTranslationConfiguration {
         SpeechTranslationConfiguration(
-            sourceLanguage: speechSourceLanguage,
-            targetLanguage: speechTargetLanguage
+            provider: speechProvider,
+            sourceCode: speechSourceLanguage,
+            targetCode: speechTargetLanguage
         )
     }
 }

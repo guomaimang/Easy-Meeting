@@ -36,8 +36,8 @@ final class VolcengineHelperSpeechClient: SpeechClient, @unchecked Sendable {
                 apiKey: settings.volcengineAPIKey,
                 resourceID: AppSettings.volcengineResourceID,
                 mode: "s2t",
-                sourceLanguage: configuration.sourceLanguage.rawValue,
-                targetLanguage: configuration.targetLanguage.rawValue,
+                sourceLanguage: configuration.sourceCode,
+                targetLanguage: configuration.targetCode,
                 meetingID: meetingID.uuidString
             ))
             isRunning = true

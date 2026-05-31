@@ -104,9 +104,11 @@ final class StatusBarController: NSObject {
             return
         }
         var settings = settingsStore.settings
+        // 翻译预设是火山快捷填充，选择时切回火山服务商
+        settings.speechProvider = .volcengine
         settings.speechMode = mode
-        settings.speechSourceLanguage = mode.configuration.sourceLanguage
-        settings.speechTargetLanguage = mode.configuration.targetLanguage
+        settings.speechSourceLanguage = mode.configuration.sourceCode
+        settings.speechTargetLanguage = mode.configuration.targetCode
         do {
             try settingsStore.save(settings)
             overlayController.showStatus(source: "已切换翻译模式", translation: "\(mode.title)：\(mode.detail)")
@@ -191,15 +193,31 @@ final class StatusBarController: NSObject {
     }
 
     private func speechModeMenuItem() -> NSMenuItem {
+        let settings = settingsStore.settings
+        // Azure 语种代号体系与火山不同，不复用火山预设；菜单显示当前语种对并引导去设置
+        guard settings.speechProvider == .volcengine else {
+            let configuration = settings.speechConfiguration
+            let item = NSMenuItem(title: "翻译语种", action: nil, keyEquivalent: "")
+            let submenu = NSMenu()
+            let current = NSMenuItem(title: "当前：\(configuration.title)", action: nil, keyEquivalent: "")
+            current.isEnabled = false
+            submenu.addItem(current)
+            submenu.addItem(NSMenuItem.separator())
+            submenu.addItem(NSMenuItem(title: "在设置中修改…", action: #selector(openSettings), keyEquivalent: ""))
+            submenu.items.forEach { $0.target = self }
+            item.submenu = submenu
+            return item
+        }
+
         let item = NSMenuItem(title: "翻译模式", action: nil, keyEquivalent: "")
         let submenu = NSMenu()
 
         SpeechMode.allCases.forEach { mode in
             let modeItem = NSMenuItem(title: mode.title, action: #selector(selectSpeechMode), keyEquivalent: "")
             modeItem.representedObject = mode.rawValue
-            let configuration = settingsStore.settings.speechConfiguration
-            modeItem.state = mode.configuration.sourceLanguage == configuration.sourceLanguage &&
-                mode.configuration.targetLanguage == configuration.targetLanguage ? .on : .off
+            let configuration = settings.speechConfiguration
+            modeItem.state = mode.configuration.sourceCode == configuration.sourceCode &&
+                mode.configuration.targetCode == configuration.targetCode ? .on : .off
             submenu.addItem(modeItem)
         }
 

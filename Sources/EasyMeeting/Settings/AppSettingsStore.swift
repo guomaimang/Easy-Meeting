@@ -25,8 +25,9 @@ final class AppSettingsStore {
         let speechMode = SpeechMode(rawValue: modeRawValue) ?? fallback.speechMode
         let sourceRawValue = defaults.string(forKey: Keys.speechSourceLanguage) ?? speechMode.sourceLanguage
         let targetRawValue = defaults.string(forKey: Keys.speechTargetLanguage) ?? speechMode.targetLanguage
-        let sourceLanguage = SpeechLanguage(rawValue: sourceRawValue) ?? fallback.speechSourceLanguage
-        let targetLanguage = SpeechLanguage(rawValue: targetRawValue) ?? fallback.speechTargetLanguage
+        // 代号必须属于当前服务商，否则回落到该服务商默认值
+        let sourceLanguage = SpeechLanguageCatalog.validatedSourceCode(sourceRawValue, for: provider)
+        let targetLanguage = SpeechLanguageCatalog.validatedTargetCode(targetRawValue, for: provider)
         let apiKey = KeychainStore.read(account: Keys.volcengineAPIKey)
         let azureSpeechKey = KeychainStore.read(account: Keys.azureSpeechKey)
         let azureSpeechRegion = defaults.string(forKey: Keys.azureSpeechRegion) ?? fallback.azureSpeechRegion
@@ -49,8 +50,8 @@ final class AppSettingsStore {
     func save(_ settings: AppSettings) throws {
         defaults.set(settings.speechProvider.rawValue, forKey: Keys.speechProvider)
         defaults.set(settings.speechMode.rawValue, forKey: Keys.speechMode)
-        defaults.set(settings.speechSourceLanguage.rawValue, forKey: Keys.speechSourceLanguage)
-        defaults.set(settings.speechTargetLanguage.rawValue, forKey: Keys.speechTargetLanguage)
+        defaults.set(settings.speechSourceLanguage, forKey: Keys.speechSourceLanguage)
+        defaults.set(settings.speechTargetLanguage, forKey: Keys.speechTargetLanguage)
         defaults.set(settings.azureSpeechRegion, forKey: Keys.azureSpeechRegion)
         defaults.set(Self.clampedOpacity(settings.overlayOpacity), forKey: Keys.overlayOpacity)
         defaults.set(Self.clampedFontSize(settings.overlayFontSize), forKey: Keys.overlayFontSize)

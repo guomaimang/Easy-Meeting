@@ -117,6 +117,13 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         }
         lastSelectedProvider = selectedProvider()
         setAPIKey(currentProviderKeyDraft())
+        // 切换 provider：代号体系不同，直接用新服务商默认语种重填下拉框
+        let provider = selectedProvider()
+        reloadLanguagePopUps(
+            sourceCode: SpeechLanguageCatalog.defaultSourceCode(for: provider),
+            targetCode: SpeechLanguageCatalog.defaultTargetCode(for: provider)
+        )
+        updateSpeechModeDetail()
         renderSelectedSection()
     }
 
@@ -191,8 +198,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         speechModePopUp.addItems(withTitles: SpeechMode.allCases.map(\.title))
         speechModePopUp.target = self
         speechModePopUp.action = #selector(changeSpeechMode)
-        sourceLanguagePopUp.addItems(withTitles: SpeechLanguage.sourceCases.map(\.menuTitle))
-        targetLanguagePopUp.addItems(withTitles: SpeechLanguage.targetCases.map(\.menuTitle))
+        // 源/目标语种下拉框按当前 provider 在 loadSettings/changeProvider 里动态填充
         sourceLanguagePopUp.target = self
         targetLanguagePopUp.target = self
         sourceLanguagePopUp.action = #selector(changeSpeechLanguage)
@@ -220,8 +226,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         if let index = SpeechMode.allCases.firstIndex(of: settings.speechMode) {
             speechModePopUp.selectItem(at: index)
         }
-        selectSourceLanguage(settings.speechSourceLanguage)
-        selectTargetLanguage(settings.speechTargetLanguage)
+        reloadLanguagePopUps(sourceCode: settings.speechSourceLanguage, targetCode: settings.speechTargetLanguage)
         volcengineKeyDraft = settings.volcengineAPIKey
         azureKeyDraft = settings.azureSpeechKey
         lastSelectedProvider = settings.speechProvider

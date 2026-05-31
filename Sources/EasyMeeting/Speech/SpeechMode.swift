@@ -64,8 +64,9 @@ enum SpeechMode: String, CaseIterable {
 
     var configuration: SpeechTranslationConfiguration {
         SpeechTranslationConfiguration(
-            sourceLanguage: SpeechLanguage(rawValue: sourceLanguage) ?? .en,
-            targetLanguage: SpeechLanguage(rawValue: targetLanguage) ?? .zh
+            provider: .volcengine,
+            sourceCode: sourceLanguage,
+            targetCode: targetLanguage
         )
     }
 }

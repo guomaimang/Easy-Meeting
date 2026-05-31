@@ -81,33 +81,44 @@ Azure SDK 事件 → 本项目事件：
 
 `translation_end` 是一次完整双语字幕的唯一提交点，与火山规则一致，避免重复落库。
 
-## 语种映射
+## 语种设计：按服务商分表
 
-本项目内部用 `SpeechLanguage`（火山码），Azure 需要带地区后缀的识别码和翻译码：
+语言表按服务商分开维护，UI 下拉框直接产出当前服务商的原生代号，
+不做跨服务商的统一枚举（这是早期实现的错误，已纠正）。
 
-- 识别语言（源）：BCP-47，如 `en-US`、`zh-CN`、`ja-JP`、`yue-CN`。
-- 翻译语言（目标）：简码或脚本码，如 `zh-Hans`、`en`、`ja`、`ko`。
+Azure 的源和目标是两套**不同**的代号体系：
 
-映射表见 `Sources/EasyMeeting/Speech/Azure/AzureLanguageMapping.swift`。
-数据来源：https://learn.microsoft.com/azure/ai-services/speech-service/language-support
+- 识别语言（源）：BCP-47 带地区后缀，如 `en-US`、`zh-CN`、`zh-HK`、`yue-CN`、`ja-JP`。
+- 翻译语言（目标）：简码/脚本码，如 `zh-Hans`、`zh-Hant`、`yue`、`en`、`ja`。
 
-### 不支持的组合
+同一种语言在源和目标里写法不同（中文：源 `zh-CN`，目标 `zh-Hans`），不能混用。
+当前为会议常用精选（约 18 种），数据来源：
+https://learn.microsoft.com/azure/ai-services/speech-service/language-support
 
-- `zhen`（中英反转互译）是火山专属能力，Azure 单识别器不支持双向互译。
-  选择 Azure 且源或目标为 `zhen` 时，设置页给出明确校验提示，不静默失败。
-- 火山方言码 `sh-CN`（上海话）Azure 识别码为 `wuu-CN`（吴语），近似映射。
+相关文件：
+
+- `Speech/Languages/SpeechLanguageOption.swift`：语言选项（代号 + 显示名）。
+- `Speech/Languages/AzureLanguageCatalog.swift`：Azure 识别/翻译两张表。
+- `Speech/Languages/VolcengineLanguageCatalog.swift`：火山源/目标表（共用代号）。
+- `Speech/Languages/SpeechLanguageCatalog.swift`：按服务商取表、默认值、校验。
+
+### 与火山的差异
+
+- 火山源/目标共用一套代号（`zh`/`en`/`ja`/`zhen`…），`zhen` 中英互译两边必须同时选。
+- Azure 不提供单识别器的中英双向互译，因此 Azure 表里**没有** `zhen`；
+  火山专属的方言码 `yue-CN`、`sh-CN` 也不出现在 Azure 表，避免无意义选项。
+- 切换服务商时下拉框按新服务商重填，并回落到新服务商默认语种。
 
 ## Swift 侧分层
 
 `Sources/EasyMeeting/Speech/Azure/` 按职责拆分，镜像火山结构，每文件 < 300 行：
 
 - `AzureHelperSpeechClient.swift`：实现 `SpeechClient`，拉起 Node helper、写命令、
-  按行解析 stdout、回传领域事件。
+  按行解析 stdout、回传领域事件。配置里的源/目标代号已是 Azure 原生码，直接透传。
 - `AzureHelperProtocol.swift`：定义 `AzureHelperCommand`、`AzureHelperEvent`、
   `AzureHelperError`，唯一描述线协议的地方。
 - `AzureHelperRuntime.swift`：定位 helper（bundle、可执行目录、`Helpers/` 源码目录）
   与生成配置诊断文本，供设置页“检查配置”复用。
-- `AzureLanguageMapping.swift`：`SpeechLanguage` → Azure 识别码 / 翻译码映射。
 
 ## Node helper 结构
 
