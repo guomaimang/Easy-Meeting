@@ -124,6 +124,7 @@ Azure 设置页和菜单栏的翻译预设只提供三项：
 
 - `AzureHelperSpeechClient.swift`：实现 `SpeechClient`，拉起 Node helper、写命令、
   按行解析 stdout、回传领域事件。配置里的源/目标代号已是 Azure 原生码，直接透传。
+  `stop()` 负责强制清理：`finish` → `terminate()` → 超时未退出则 SIGKILL 兜底。
 - `AzureHelperProtocol.swift`：定义 `AzureHelperCommand`、`AzureHelperEvent`、
   `AzureHelperError`，唯一描述线协议的地方。
 - `AzureHelperRuntime.swift`：定位 helper（bundle、可执行目录、`Helpers/` 源码目录）
@@ -134,9 +135,48 @@ Azure 设置页和菜单栏的翻译预设只提供三项：
 `Helpers/AzureSpeechHelper/`：
 
 - `package.json`：依赖 `microsoft-cognitiveservices-speech-sdk`。
-- `index.js`：stdin 主循环，解析命令，分发到翻译会话。
+- `index.js`：stdin 主循环，解析命令，分发到翻译会话；并负责进程退出回收
+  （stdin EOF / SIGTERM / SIGINT 即停识别器并退出，见「进程生命周期与回收」）。
 - `azureTranslation.js`：`SpeechTranslationConfig` + `TranslationRecognizer`
   配置、推流、事件绑定，移植自 reference 的 `azureSpeechRecognizers.js`。
+
+## 进程生命周期与回收
+
+helper 是常驻子进程，必须保证「主 App 一旦消失，helper 立即停掉识别器并退出」，
+否则残留会话会持续占用 CPU、悬挂 WebSocket 连接。
+
+### 回收的核心：recognizer.close()
+
+回收链对齐 reference/Meeting-Copilot 的 `stopRecognition` → `_cleanup`：
+
+```
+stopContinuousRecognitionAsync(成功/失败都回调) → recognizer.close() → pushStream.close()
+```
+
+关键是 `recognizer.close()`：它置位 SDK 内部的 `privIsDisposed`，而接收主循环
+`ServiceRecognizerBase.receiveMessage` 开头就是 `if (this.privIsDisposed) return;`，
+于是循环在下一跳被干净终止——**从源头掐断**，而不是从外部强杀。这也是参考实现
+能保证「页面关掉后没有残留识别」的原理（浏览器卸载组件时调 `close`）。
+
+`azureTranslation.js` 的 `finish()` 已实现这条链，是回收的唯一入口。
+
+### 触发回收的信号
+
+主 App 消失时，helper 靠以下信号触发 `finish()` 并退出：
+
+- **stdin EOF**（`readline` close / `stdin` end）：父进程无论正常退出还是被
+  SIGKILL，内核都会关闭它持有的 stdin 管道写端，子进程随即收到 EOF。
+  这是 macOS 上最可靠的「父进程没了」探测，不需要轮询 PPID。
+- **SIGTERM / SIGINT**：Swift 侧 `stop()` 主动发 SIGTERM，收到即回收退出。
+
+`shutdownAndExit()` 收到任一信号后先调 `session.finish()`，再用一个 `unref` 的短超时
+强制 `process.exit(0)`，避免 SDK 异步收尾吊住进程不退出。`unref` 不阻止正常路径自然退出。
+
+### Swift 端强制清理
+
+`stop()`：发 `finish` → `terminate()`（SIGTERM）→ 超时（3s）仍存活则 SIGKILL 兜底。
+App 退出（`applicationWillTerminate`）对所有活跃 client 调 `stop()`，确保不漏 helper。
+SIGKILL 是最后兜底：即便 helper 自身回收逻辑全部失效，宿主也能强制终止它。
 
 ## 运行时与打包
 

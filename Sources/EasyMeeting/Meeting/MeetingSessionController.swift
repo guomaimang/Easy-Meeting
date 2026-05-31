@@ -122,6 +122,14 @@ final class MeetingSessionController {
         }
     }
 
+    /// App 退出时的兜底清理：无视录音状态，立即停掉语音 helper，
+    /// 避免主进程消失后留下残留的 helper 子进程。详见 docs/azure-speech.md。
+    func shutdownForAppTermination() {
+        cancelAutoStopTimer()
+        speechClient?.stop()
+        speechClient = nil
+    }
+
     private func scheduleAutoStop(
         onStatus: @escaping @MainActor (String, String) -> Void,
         onMenuUpdate: @escaping @MainActor () -> Void

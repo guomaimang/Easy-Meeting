@@ -59,6 +59,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         false
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        // 正常退出路径的兜底：确保停掉语音 helper 子进程，不留孤儿。
+        meetingSessionController?.shutdownForAppTermination()
+    }
+
     @MainActor
     private func setupMainMenu() {
         let mainMenu = NSMenu()

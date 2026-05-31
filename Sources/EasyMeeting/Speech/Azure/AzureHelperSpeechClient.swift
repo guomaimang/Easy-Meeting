@@ -84,12 +84,30 @@ final class AzureHelperSpeechClient: SpeechClient, @unchecked Sendable {
             try? send(AzureHelperCommand.finish)
         }
         input?.closeFile()
-        process?.terminate()
+
+        // 捕获进程引用，先发 SIGTERM，再用宽限期后的 SIGKILL 兜底：
+        // helper 失去 stdin 后理应自行回收（停识别器并退出），但若异步收尾卡住进程，
+        // 必须强杀，避免残留会话占用 CPU。详见 docs/azure-speech.md。
+        if let runningProcess = process {
+            runningProcess.terminate()
+            forceKillIfAlive(runningProcess, after: .seconds(3))
+        }
+
         process = nil
         input = nil
         isRunning = false
         onEvent = nil
         outputBuffer.removeAll(keepingCapacity: false)
+    }
+
+    /// 宽限期过后若进程仍存活，发送 SIGKILL 强制终止。
+    private func forceKillIfAlive(_ process: Process, after delay: DispatchTimeInterval) {
+        let pid = process.processIdentifier
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            guard process.isRunning else { return }
+            NSLog("Azure helper 未在宽限期内退出，发送 SIGKILL：pid=%d", pid)
+            kill(pid, SIGKILL)
+        }
     }
 
     private func launchHelper(node: URL, script: URL) throws {

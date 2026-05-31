@@ -63,9 +63,37 @@ rl.on('line', (line) => {
   }
 })
 
-rl.on('close', () => {
-  session.finish()
-})
+/**
+ * 退出回收：失去父进程时停掉识别器并退出。
+ * 对齐 reference/Meeting-Copilot 的 stopRecognition → close 回收链：
+ * recognizer.close() 会置位 SDK 的 privIsDisposed，receiveMessage 开头即 return，
+ * 从源头掐断接收循环，避免残留会话空烧 CPU。详见 docs/azure-speech.md。
+ */
+let exiting = false
+function shutdownAndExit(code) {
+  if (exiting) {
+    return
+  }
+  exiting = true
+  try {
+    session.finish()
+  } catch (_) {
+    /* ignore */
+  }
+  // 给 finish 的异步收尾（stopContinuousRecognitionAsync → close）留点时间，
+  // 但无论如何强制退出，不让 SDK 事件循环吊住进程。unref 不阻止正常退出。
+  setTimeout(() => process.exit(code), 1000).unref()
+}
+
+// 父进程消失的信号来源（macOS 上最可靠的「父进程没了」探测）：
+// 父进程无论正常退出还是被 SIGKILL，内核都会关闭它持有的 stdin 管道写端，
+// 子进程随即收到 EOF（readline close / stdin end），触发回收并退出。
+rl.on('close', () => shutdownAndExit(0))
+process.stdin.on('end', () => shutdownAndExit(0))
+
+// Swift 侧 stop() 会先发 SIGTERM，收到即回收退出；SIGINT 同理。
+process.on('SIGTERM', () => shutdownAndExit(0))
+process.on('SIGINT', () => shutdownAndExit(0))
 
 process.on('uncaughtException', (err) => {
   emit({ type: 'error', message: `uncaught: ${err.message}` })
