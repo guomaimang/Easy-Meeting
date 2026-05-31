@@ -150,6 +150,8 @@ AST 会分别返回原文字幕和译文字幕，每一侧都有 start、respons
 
 - helper 必须等到 `SessionStarted` 后再发送音频；建联成功前收到的麦克风音频只能短暂缓存。
 - helper 按官方建议把 16kHz、16bit、单声道 PCM 切成约 80ms 的 `TaskRequest` 包，避免系统音频回调帧过大导致服务端延迟出字幕。
+- helper 必须像 reference 项目一样保留 AST 字幕事件类型，分别输出 `source_start/source/source_end` 和 `translation_start/translation/translation_end`，不能先揉成一个通用 subtitle 事件。
+- Swift 展示层分别维护原文草稿和译文草稿；原文 response 只刷新左侧当前行，译文 response 只刷新右侧当前行。
 - `SourceSubtitleResponse` 和 `TranslationSubtitleResponse` 只更新当前草稿行，悬浮窗必须实时刷新同一行。
 - `SourceSubtitleEnd` 只确认原文草稿，不单独提交最终字幕。
 - `TranslationSubtitleEnd` 作为一次完整双语字幕的唯一提交点；源文事件无论先后都不能触发提交。

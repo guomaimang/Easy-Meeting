@@ -92,7 +92,7 @@ final class MeetingSessionController {
         client.start(configuration: settingsStore.settings.speechConfiguration, meetingID: meeting.id) { [weak self] event in
             guard let self else { return }
 
-            guard event.sourceLanguage != "system" else {
+            guard event.kind != .system else {
                 onStatus(event.sourceText, event.translatedText)
                 return
             }
@@ -100,7 +100,8 @@ final class MeetingSessionController {
             let display = subtitleDisplay.apply(event)
             onStatus(display.source, display.translation)
 
-            guard event.isFinal, event.translatedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
+            guard event.kind == .translationFinal,
+                  event.translatedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
                 return
             }
             let transcriptKey = Self.transcriptKey(for: event)
@@ -138,51 +139,85 @@ final class MeetingSessionController {
 }
 
 private struct SubtitleDisplayBuffer {
-    private struct Line: Equatable {
-        var source: String
-        var translation: String
-
-        var isEmpty: Bool {
-            source.isEmpty && translation.isEmpty
-        }
-    }
-
-    private var committed: [Line] = []
-    private var current: Line?
-    private var lastCommitted: Line?
+    private var committedSources: [String] = []
+    private var committedTranslations: [String] = []
+    private var currentSource = ""
+    private var currentTranslation = ""
+    private var lastCommittedSource = ""
+    private var lastCommittedTranslation = ""
 
     mutating func reset() {
-        committed.removeAll(keepingCapacity: true)
-        current = nil
-        lastCommitted = nil
+        committedSources.removeAll(keepingCapacity: true)
+        committedTranslations.removeAll(keepingCapacity: true)
+        currentSource = ""
+        currentTranslation = ""
+        lastCommittedSource = ""
+        lastCommittedTranslation = ""
     }
 
     mutating func apply(_ event: RealtimeSpeechEvent) -> (source: String, translation: String) {
         let source = event.sourceText.trimmingCharacters(in: .whitespacesAndNewlines)
         let translation = event.translatedText.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        if source.isEmpty == false || translation.isEmpty == false {
-            let previousSource = current?.source ?? ""
-            let previousTranslation = current?.translation ?? ""
-            current = Line(
-                source: source.isEmpty ? previousSource : source,
-                translation: translation.isEmpty ? previousTranslation : translation
-            )
-        }
-
-        if event.isFinal, let line = current, line.isEmpty == false, line.translation.isEmpty == false {
-            if line != lastCommitted {
-                committed.append(line)
-                lastCommitted = line
+        switch event.kind {
+        case .sourceStart:
+            currentSource = ""
+        case .sourceInterim:
+            if source.isEmpty == false {
+                currentSource = source
             }
-            current = nil
+        case .sourceFinal:
+            if source.isEmpty == false {
+                currentSource = source
+            }
+            commitCurrentSource()
+        case .translationStart:
+            currentTranslation = ""
+        case .translationInterim:
+            if translation.isEmpty == false {
+                currentTranslation = translation
+            }
+        case .translationFinal:
+            if translation.isEmpty == false {
+                currentTranslation = translation
+            }
+            commitCurrentTranslation()
+        case .system:
+            break
         }
 
-        let visible = committed + [current].compactMap { $0 }
         return (
-            visible.map(\.source).joined(separator: "\n"),
-            visible.map(\.translation).joined(separator: "\n")
+            visibleLines(committedSources, currentSource).joined(separator: "\n"),
+            visibleLines(committedTranslations, currentTranslation).joined(separator: "\n")
         )
+    }
+
+    private mutating func commitCurrentSource() {
+        let text = currentSource.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard text.isEmpty == false else { return }
+        if text != lastCommittedSource {
+            committedSources.append(text)
+            lastCommittedSource = text
+        }
+        currentSource = ""
+    }
+
+    private mutating func commitCurrentTranslation() {
+        let text = currentTranslation.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard text.isEmpty == false else { return }
+        if text != lastCommittedTranslation {
+            committedTranslations.append(text)
+            lastCommittedTranslation = text
+        }
+        currentTranslation = ""
+    }
+
+    private func visibleLines(_ committed: [String], _ current: String) -> [String] {
+        let draft = current.trimmingCharacters(in: .whitespacesAndNewlines)
+        if draft.isEmpty {
+            return committed
+        }
+        return committed + [draft]
     }
 }
 

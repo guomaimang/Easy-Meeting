@@ -6,3 +6,4 @@
 - 修正源文新分段重置 final 状态导致旧译文被再次提交的问题，最终提交只允许由译文 end 触发。
 - 对齐 AST 参考实现的启动音频格式，握手使用 `format=wav`、`codec=raw`，实时音频分片继续发送 16k PCM。
 - helper 等待 `SessionStarted` 后再发送音频，并按 80ms 切分 PCM，降低服务端攒包造成的字幕延迟。
+- 对齐 reference 项目的事件模型，helper 分别输出原文和译文事件，Swift 分别维护两侧草稿，避免合并 subtitle 吞掉流式语义。

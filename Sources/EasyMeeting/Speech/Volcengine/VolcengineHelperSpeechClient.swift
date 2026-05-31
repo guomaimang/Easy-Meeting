@@ -137,7 +137,7 @@ final class VolcengineHelperSpeechClient: SpeechClient, @unchecked Sendable {
             switch event.type {
             case "status":
                 NSLog("火山 helper 状态：%@ %@", event.message ?? "", event.detail ?? "")
-            case "subtitle":
+            case "source_start", "source", "source_end", "translation_start", "translation", "translation_end", "subtitle":
                 emitSpeechEvent(event)
             case "error":
                 emitStatus("火山 helper 错误", event.message ?? "未知错误")
@@ -150,7 +150,9 @@ final class VolcengineHelperSpeechClient: SpeechClient, @unchecked Sendable {
     }
 
     private func emitSpeechEvent(_ event: VolcengineHelperEvent) {
+        let kind = speechEventKind(for: event.type)
         onEvent?(RealtimeSpeechEvent(
+            kind: kind,
             sourceText: event.sourceText ?? "",
             translatedText: event.translatedText ?? "",
             startMilliseconds: event.startMilliseconds ?? 0,
@@ -160,6 +162,25 @@ final class VolcengineHelperSpeechClient: SpeechClient, @unchecked Sendable {
             isInterim: event.isInterim ?? false,
             isFinal: event.isFinal ?? false
         ))
+    }
+
+    private func speechEventKind(for type: String) -> RealtimeSpeechEvent.Kind {
+        switch type {
+        case "source_start":
+            return .sourceStart
+        case "source":
+            return .sourceInterim
+        case "source_end":
+            return .sourceFinal
+        case "translation_start":
+            return .translationStart
+        case "translation":
+            return .translationInterim
+        case "translation_end", "subtitle":
+            return .translationFinal
+        default:
+            return .system
+        }
     }
 
     private func handleStderr(_ data: Data) {
@@ -175,6 +196,7 @@ final class VolcengineHelperSpeechClient: SpeechClient, @unchecked Sendable {
 
     private func emitStatus(_ source: String, _ translation: String) {
         onEvent?(RealtimeSpeechEvent(
+            kind: .system,
             sourceText: source,
             translatedText: translation,
             startMilliseconds: 0,

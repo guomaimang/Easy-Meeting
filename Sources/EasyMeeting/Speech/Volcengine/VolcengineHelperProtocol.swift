@@ -70,6 +70,7 @@ struct VolcengineHelperEvent: Decodable {
     let type: String
     let message: String?
     let detail: String?
+    let text: String?
     let sourceText: String?
     let translatedText: String?
     let startMilliseconds: Int?

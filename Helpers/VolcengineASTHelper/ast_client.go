@@ -156,19 +156,27 @@ func (c *astClient) handleResponse(resp *ast.TranslateResponse) bool {
 		return true
 	case event.Type_SourceSubtitleStart:
 		c.currentSource = ""
+		c.out.send(c.subtitleEvent("source_start", resp, "", false))
 	case event.Type_SourceSubtitleResponse, event.Type_SourceSubtitleEnd:
 		c.currentSource = mergeSubtitleText(c.currentSource, resp.GetText())
-		c.out.send(c.subtitleEvent(resp, c.currentSource, c.currentTarget, false))
+		eventType := "source"
+		if resp.GetEvent() == event.Type_SourceSubtitleEnd {
+			eventType = "source_end"
+		}
+		c.out.send(c.subtitleEvent(eventType, resp, c.currentSource, false))
 	case event.Type_TranslationSubtitleStart:
 		c.currentTarget = ""
 		c.finalEmitted = false
+		c.out.send(c.subtitleEvent("translation_start", resp, "", false))
 	case event.Type_TranslationSubtitleResponse, event.Type_TranslationSubtitleEnd:
 		c.currentTarget = mergeSubtitleText(c.currentTarget, resp.GetText())
 		isFinal := false
+		eventType := "translation"
 		if resp.GetEvent() == event.Type_TranslationSubtitleEnd {
+			eventType = "translation_end"
 			isFinal = c.consumeFinalIfReady()
 		}
-		c.out.send(c.subtitleEvent(resp, c.currentSource, c.currentTarget, isFinal))
+		c.out.send(c.subtitleEvent(eventType, resp, c.currentTarget, isFinal))
 	case event.Type_UsageResponse:
 		c.out.logf("usage response: status=%d message=%q", resp.GetResponseMeta().GetStatusCode(), resp.GetResponseMeta().GetMessage())
 	}
@@ -183,11 +191,12 @@ func (c *astClient) consumeFinalIfReady() bool {
 	return true
 }
 
-func (c *astClient) subtitleEvent(resp *ast.TranslateResponse, source, translated string, isFinal bool) helperEvent {
+func (c *astClient) subtitleEvent(eventType string, resp *ast.TranslateResponse, text string, isFinal bool) helperEvent {
 	return helperEvent{
-		Type:              "subtitle",
-		SourceText:        source,
-		TranslatedText:    translated,
+		Type:              eventType,
+		Text:              text,
+		SourceText:        c.currentSource,
+		TranslatedText:    c.currentTarget,
 		StartMilliseconds: resp.GetStartTime(),
 		EndMilliseconds:   resp.GetEndTime(),
 		SourceLanguage:    c.sourceLanguage,

@@ -27,7 +27,7 @@ func TestSourceEndDoesNotEmitFinalWithPreviousTranslation(t *testing.T) {
 	client.handleResponse(&ast.TranslateResponse{Event: event.Type_SourceSubtitleResponse, Text: "Okay"})
 	client.handleResponse(&ast.TranslateResponse{Event: event.Type_SourceSubtitleEnd, Text: "."})
 
-	events := decodeSubtitleEvents(t, buffer.Bytes())
+	events := decodeHelperEvents(t, buffer.Bytes())
 	finalCount := 0
 	for _, evt := range events {
 		if evt.IsFinal {
@@ -36,6 +36,25 @@ func TestSourceEndDoesNotEmitFinalWithPreviousTranslation(t *testing.T) {
 	}
 	if finalCount != 1 {
 		t.Fatalf("final event count = %d, want 1; events = %+v", finalCount, events)
+	}
+}
+
+func TestSubtitleResponsesKeepSourceAndTranslationEventTypes(t *testing.T) {
+	var buffer bytes.Buffer
+	client := newASTClient(&output{encoder: json.NewEncoder(&buffer)})
+
+	client.handleResponse(&ast.TranslateResponse{Event: event.Type_SourceSubtitleResponse, Text: "Hello"})
+	client.handleResponse(&ast.TranslateResponse{Event: event.Type_TranslationSubtitleResponse, Text: "你好"})
+
+	events := decodeHelperEvents(t, buffer.Bytes())
+	if len(events) != 2 {
+		t.Fatalf("event count = %d, want 2; events = %+v", len(events), events)
+	}
+	if events[0].Type != "source" || events[0].Text != "Hello" {
+		t.Fatalf("source event = %+v", events[0])
+	}
+	if events[1].Type != "translation" || events[1].Text != "你好" {
+		t.Fatalf("translation event = %+v", events[1])
 	}
 }
 
@@ -48,7 +67,7 @@ func TestAudioIsBufferedBeforeSessionStarted(t *testing.T) {
 	}
 }
 
-func decodeSubtitleEvents(t *testing.T, data []byte) []helperEvent {
+func decodeHelperEvents(t *testing.T, data []byte) []helperEvent {
 	t.Helper()
 
 	decoder := json.NewDecoder(bytes.NewReader(data))
@@ -61,7 +80,7 @@ func decodeSubtitleEvents(t *testing.T, data []byte) []helperEvent {
 			}
 			t.Fatalf("decode helper event: %v", err)
 		}
-		if evt.Type == "subtitle" {
+		if evt.Type != "status" {
 			events = append(events, evt)
 		}
 	}

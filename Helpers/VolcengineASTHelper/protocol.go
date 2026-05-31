@@ -19,6 +19,7 @@ type helperEvent struct {
 	Type                  string `json:"type"`
 	Message               string `json:"message,omitempty"`
 	Detail                string `json:"detail,omitempty"`
+	Text                  string `json:"text,omitempty"`
 	SourceText            string `json:"sourceText,omitempty"`
 	TranslatedText        string `json:"translatedText,omitempty"`
 	StartMilliseconds     int32  `json:"startMilliseconds,omitempty"`
