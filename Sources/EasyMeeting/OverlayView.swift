@@ -10,8 +10,10 @@ final class OverlayView: NSView {
     }
     var onDrag: ((OverlayDragGesture) -> Void)?
 
-    private let scrollView = OverlayScrollView()
-    private let contentView = OverlayContentView()
+    private let sourceScrollView = OverlayScrollView()
+    private let translationScrollView = OverlayScrollView()
+    private let sourceContentView = OverlayContentView()
+    private let translationContentView = OverlayContentView()
     private let sourceLabel = NSTextField(wrappingLabelWithString: "")
     private let translationLabel = NSTextField(wrappingLabelWithString: "")
     private let separatorView = NSView()
@@ -42,18 +44,27 @@ final class OverlayView: NSView {
     }
 
     func update(source: String, translation: String) {
-        let shouldFollow = scrollView.isPinnedToBottom
+        let sourceShouldFollow = sourceScrollView.isPinnedToBottom
+        let translationShouldFollow = translationScrollView.isPinnedToBottom
         sourceLabel.stringValue = source
         translationLabel.stringValue = translation
         needsLayout = true
         layoutSubtreeIfNeeded()
-        if shouldFollow {
-            scrollView.scrollToBottom()
+        if sourceShouldFollow {
+            sourceScrollView.scrollToBottom()
+        }
+        if translationShouldFollow {
+            translationScrollView.scrollToBottom()
         }
     }
 
     override func scrollWheel(with event: NSEvent) {
-        scrollView.scrollWheel(with: event)
+        let point = convert(event.locationInWindow, from: nil)
+        if point.x < bounds.midX {
+            sourceScrollView.scrollWheel(with: event)
+        } else {
+            translationScrollView.scrollWheel(with: event)
+        }
     }
 
     override func mouseDown(with event: NSEvent) {
@@ -103,19 +114,28 @@ final class OverlayView: NSView {
         let inset: CGFloat = 18
         let gap: CGFloat = 18
         let viewport = bounds.insetBy(dx: inset, dy: inset)
-        scrollView.frame = viewport
 
         let columnWidth = max((viewport.width - gap) / 2, 120)
-        let labelHeight = max(
-            sourceLabel.heightFor(width: columnWidth),
-            translationLabel.heightFor(width: columnWidth),
-            viewport.height
+        let sourceHeight = max(sourceLabel.heightFor(width: columnWidth), viewport.height)
+        let translationHeight = max(translationLabel.heightFor(width: columnWidth), viewport.height)
+
+        sourceScrollView.frame = NSRect(x: viewport.minX, y: viewport.minY, width: columnWidth, height: viewport.height)
+        translationScrollView.frame = NSRect(
+            x: viewport.minX + columnWidth + gap,
+            y: viewport.minY,
+            width: columnWidth,
+            height: viewport.height
         )
-        let documentHeight = max(labelHeight, viewport.height)
-        contentView.frame = NSRect(x: 0, y: 0, width: viewport.width, height: documentHeight)
-        sourceLabel.frame = NSRect(x: 0, y: 0, width: columnWidth, height: labelHeight)
-        translationLabel.frame = NSRect(x: columnWidth + gap, y: 0, width: columnWidth, height: labelHeight)
-        separatorView.frame = NSRect(x: columnWidth + gap / 2, y: 0, width: 1, height: documentHeight)
+        sourceContentView.frame = NSRect(x: 0, y: 0, width: columnWidth, height: sourceHeight)
+        translationContentView.frame = NSRect(x: 0, y: 0, width: columnWidth, height: translationHeight)
+        sourceLabel.frame = NSRect(x: 0, y: 0, width: columnWidth, height: sourceHeight)
+        translationLabel.frame = NSRect(x: 0, y: 0, width: columnWidth, height: translationHeight)
+        separatorView.frame = NSRect(
+            x: viewport.minX + columnWidth + gap / 2,
+            y: viewport.minY,
+            width: 1,
+            height: viewport.height
+        )
     }
 
     private func setupLabels() {
@@ -127,20 +147,26 @@ final class OverlayView: NSView {
         translationLabel.lineBreakMode = .byWordWrapping
         translationLabel.maximumNumberOfLines = 0
 
+        setupScrollView(sourceScrollView, contentView: sourceContentView)
+        setupScrollView(translationScrollView, contentView: translationContentView)
+        separatorView.wantsLayer = true
+        separatorView.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.14).cgColor
+        applyFonts()
+
+        sourceContentView.addSubview(sourceLabel)
+        translationContentView.addSubview(translationLabel)
+        addSubview(sourceScrollView)
+        addSubview(separatorView)
+        addSubview(translationScrollView)
+    }
+
+    private func setupScrollView(_ scrollView: OverlayScrollView, contentView: OverlayContentView) {
         scrollView.drawsBackground = false
         scrollView.hasVerticalScroller = false
         scrollView.hasHorizontalScroller = false
         scrollView.borderType = .noBorder
         scrollView.autohidesScrollers = true
         scrollView.documentView = contentView
-        separatorView.wantsLayer = true
-        separatorView.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.14).cgColor
-        applyFonts()
-
-        contentView.addSubview(sourceLabel)
-        contentView.addSubview(separatorView)
-        contentView.addSubview(translationLabel)
-        addSubview(scrollView)
     }
 
     private func applyFonts() {

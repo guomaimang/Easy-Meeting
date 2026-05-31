@@ -19,8 +19,6 @@ import (
 	"code.byted.org/data-speech/wsclientsdk/protogen/products/understanding/base"
 )
 
-const audioChunkBytes = 16000 * 2 * 80 / 1000
-
 type astClient struct {
 	out            *output
 	mu             sync.Mutex
@@ -31,8 +29,7 @@ type astClient struct {
 	currentSource  string
 	currentTarget  string
 	finalEmitted   bool
-	sessionStarted bool
-	audioBuffer    []byte
+	audioStream    audioStream
 }
 
 func newASTClient(out *output) *astClient {
@@ -69,8 +66,7 @@ func (c *astClient) start(cmd command) error {
 	c.currentSource = ""
 	c.currentTarget = ""
 	c.finalEmitted = false
-	c.sessionStarted = false
-	c.audioBuffer = c.audioBuffer[:0]
+	c.audioStream.reset()
 
 	req := &ast.TranslateRequest{
 		RequestMeta: &rpcmeta.RequestMeta{SessionID: c.sessionID},
@@ -105,48 +101,6 @@ func (c *astClient) start(cmd command) error {
 	return nil
 }
 
-func (c *astClient) sendAudio(data []byte, timestamp int) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if c.conn == nil {
-		return fmt.Errorf("session not started")
-	}
-	if len(data) == 0 {
-		return nil
-	}
-
-	c.audioBuffer = append(c.audioBuffer, data...)
-	if !c.sessionStarted {
-		return nil
-	}
-	return c.flushAudioChunksLocked(false)
-}
-
-func (c *astClient) flushAudioChunksLocked(flushRemainder bool) error {
-	req := &ast.TranslateRequest{
-		RequestMeta: &rpcmeta.RequestMeta{SessionID: c.sessionID},
-		Event:       event.Type_TaskRequest,
-	}
-
-	for len(c.audioBuffer) >= audioChunkBytes {
-		req.SourceAudio = &base.Audio{BinaryData: append([]byte(nil), c.audioBuffer[:audioChunkBytes]...)}
-		if err := send(c.conn, req); err != nil {
-			return fmt.Errorf("send audio: %w", err)
-		}
-		c.audioBuffer = c.audioBuffer[audioChunkBytes:]
-	}
-
-	if flushRemainder && len(c.audioBuffer) > 0 {
-		req.SourceAudio = &base.Audio{BinaryData: append([]byte(nil), c.audioBuffer...)}
-		if err := send(c.conn, req); err != nil {
-			return fmt.Errorf("send audio remainder: %w", err)
-		}
-		c.audioBuffer = c.audioBuffer[:0]
-	}
-	return nil
-}
-
 func (c *astClient) finish() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -154,7 +108,7 @@ func (c *astClient) finish() error {
 	if c.conn == nil {
 		return nil
 	}
-	if c.sessionStarted {
+	if c.audioStream.started {
 		if err := c.flushAudioChunksLocked(true); err != nil {
 			return err
 		}
@@ -219,14 +173,6 @@ func (c *astClient) handleResponse(resp *ast.TranslateResponse) bool {
 		c.out.logf("usage response: status=%d message=%q", resp.GetResponseMeta().GetStatusCode(), resp.GetResponseMeta().GetMessage())
 	}
 	return false
-}
-
-func (c *astClient) markSessionStarted() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	c.sessionStarted = true
-	return c.flushAudioChunksLocked(false)
 }
 
 func (c *astClient) consumeFinalIfReady() bool {

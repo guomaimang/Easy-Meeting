@@ -107,22 +107,35 @@ final class MeetingStore {
     }
 
     private func appendTranscriptLine(_ segment: TranscriptSegment, meeting: MeetingRecord) throws {
-        let transcriptURL = meeting.directoryURL.appendingPathComponent("transcript.txt")
         let sourceLine = "[\(segment.startMilliseconds)ms] \(segment.sourceText)"
         let translatedLine = segment.translatedText.map { "    \($0)" }
-        let text = ([sourceLine, translatedLine].compactMap { $0 } + [""]).joined(separator: "\n")
+        let combinedText = ([sourceLine, translatedLine].compactMap { $0 } + [""]).joined(separator: "\n")
 
-        if FileManager.default.fileExists(atPath: transcriptURL.path) == false {
-            try text.write(to: transcriptURL, atomically: true, encoding: .utf8)
+        try append(combinedText, to: meeting.directoryURL.appendingPathComponent("transcript.txt"))
+        try append(sourceLine + "\n", to: meeting.directoryURL.appendingPathComponent("transcript-source.txt"))
+
+        if let translatedLine {
+            let translationURL = meeting.directoryURL.appendingPathComponent("transcript-translation.txt")
+            let translationText = translatedLine.trimmingCharacters(in: .whitespaces) + "\n"
+            try append(translationText, to: translationURL)
+        }
+    }
+
+    private func append(_ text: String, to url: URL) throws {
+        if FileManager.default.fileExists(atPath: url.path) == false {
+            try text.write(to: url, atomically: true, encoding: .utf8)
             return
         }
 
-        let handle = try FileHandle(forWritingTo: transcriptURL)
+        let handle = try FileHandle(forWritingTo: url)
+        defer {
+            try? handle.close()
+        }
+
         try handle.seekToEnd()
         if let data = text.data(using: .utf8) {
             try handle.write(contentsOf: data)
         }
-        try handle.close()
     }
 
     private static func createMeetingDirectory(id: UUID, startedAt: Date) throws -> URL {

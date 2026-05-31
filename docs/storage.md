@@ -5,7 +5,7 @@
 采用 SQLite + 本地文件系统的混合方案。
 
 - SQLite 保存会议索引、分段文本、翻译、时间戳和导出状态。
-- 本地文件系统保存录音、导出文件和大体积附件。
+- 用户文稿目录保存录音、转录、导出文件和大体积附件，保证用户能在 Finder 中直接触达。
 - Keychain 保存 API Key、Secret、Token 等敏感配置。
 
 ## 为什么不用单一方案
@@ -30,15 +30,22 @@ Core Data：
 ```text
 ~/Library/Application Support/Easy Meeting/
   easy_meeting.sqlite
-  meetings/
-    <meeting_id>/
+
+~/Documents/Easy Meeting/
+  Meetings/
+    <yyyy-MM-dd_HHmmss>_<meeting_id>/
       audio.m4a
+      metadata.json
       transcript.txt
+      transcript-source.txt
+      transcript-translation.txt
+      transcript.md
       transcript.srt
       transcript.json
-      translation.md
-      metadata.json
 ```
+
+`Application Support` 只保存应用内部数据库。会议产物默认放入用户文稿目录，
+避免录音和文本藏在用户不容易打开的位置。
 
 ## 数据表
 
@@ -89,7 +96,7 @@ Core Data：
 - 已创建 `transcript_segments` 表。
 - 开始录音时写入会议记录。
 - 停止录音时更新结束时间。
-- 录音文件和 `metadata.json` 已保存到会议目录。
+- 录音文件、原文文本、译文文本和 `metadata.json` 已保存到用户文稿目录下的会议目录。
 - 菜单栏可读取 `meetings` 表并展示最近会议。
 - 点击最近会议会生成/刷新 `transcript.md`、`transcript.srt` 和 `transcript.json`。
 - `exports` 表会在导出功能落地时创建。

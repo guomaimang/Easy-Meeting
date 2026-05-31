@@ -41,10 +41,10 @@ func TestSourceEndDoesNotEmitFinalWithPreviousTranslation(t *testing.T) {
 
 func TestAudioIsBufferedBeforeSessionStarted(t *testing.T) {
 	client := newASTClient(&output{encoder: json.NewEncoder(io.Discard)})
-	client.audioBuffer = append(client.audioBuffer, make([]byte, audioChunkBytes+16)...)
+	client.audioStream.buffer = append(client.audioStream.buffer, make([]byte, audioChunkBytes+16)...)
 
-	if len(client.audioBuffer) != audioChunkBytes+16 {
-		t.Fatalf("buffered bytes = %d, want %d", len(client.audioBuffer), audioChunkBytes+16)
+	if len(client.audioStream.buffer) != audioChunkBytes+16 {
+		t.Fatalf("buffered bytes = %d, want %d", len(client.audioStream.buffer), audioChunkBytes+16)
 	}
 }
 

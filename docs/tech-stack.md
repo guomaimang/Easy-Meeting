@@ -22,8 +22,8 @@ Easy Meeting 是一个完整的 macOS 本地会议助手产品。
 - UI：SwiftUI + AppKit。
 - 悬浮窗：AppKit `NSPanel` / `NSWindow`。
 - 音频采集：AVFoundation / AVAudioEngine。
-- 本地数据库：SQLite。
-- 本地文件：Application Support 目录。
+- 本地数据库：SQLite，保存到 Application Support 目录。
+- 会议文件：用户文稿目录 `~/Documents/Easy Meeting/Meetings/`。
 - AST 协议编解码：随 App 打包的 Go helper。
 - 密钥保存：Keychain。
 - 普通配置：UserDefaults。

@@ -72,16 +72,24 @@ zsh scripts/package-app.sh
 
 ## 数据目录
 
-会议数据保存在：
+应用数据库保存在：
 
 ```text
 ~/Library/Application Support/Easy Meeting/
   easy_meeting.sqlite
-  meetings/
-    <meeting_id>/
+```
+
+会议录音和文本保存在用户可直接打开的文稿目录：
+
+```text
+~/Documents/Easy Meeting/
+  Meetings/
+    <yyyy-MM-dd_HHmmss>_<meeting_id>/
       audio.m4a
       metadata.json
       transcript.txt
+      transcript-source.txt
+      transcript-translation.txt
       transcript.md
       transcript.srt
       transcript.json
