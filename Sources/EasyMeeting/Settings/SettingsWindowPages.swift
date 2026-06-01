@@ -21,8 +21,50 @@ extension SettingsWindowController {
         fontSizeValueLabel.textColor = .secondaryLabelColor
         group.addSubview(fontSizeSlider)
         group.addSubview(fontSizeValueLabel)
+
+        // 退出程序分组：放在"程序"页底部，点击后弹二次确认。
+        let quitGroup = groupView(y: 120, height: 60)
+        page.addSubview(quitGroup)
+        addRowTitle("退出程序", to: quitGroup, y: 18)
+        let quitButton = NSButton(
+            title: "退出 Easy Meeting",
+            target: self,
+            action: #selector(quitApplication)
+        )
+        quitButton.bezelColor = .systemRed
+        quitButton.frame = NSRect(x: 410, y: 14, width: 148, height: 30)
+        quitGroup.addSubview(quitButton)
         return page
     }
+
+    /// 退出按钮回调：弹出系统级 NSAlert 进行二次确认，默认按钮为"取消"以防误触；
+    /// 用户确认后调用 `NSApp.terminate(nil)` 走标准退出流程，AppDelegate 中的
+    /// 清理逻辑（停录音、关闭悬浮窗等）会在 applicationWillTerminate 时执行。
+    @objc func quitApplication() {
+        let alert = NSAlert()
+        alert.messageText = "确认退出 Easy Meeting？"
+        alert.informativeText = "退出后会停止当前录音与翻译，并关闭悬浮窗。"
+        alert.alertStyle = .warning
+        // 顺序决定默认/取消按钮：第一个按钮是"退出"，第二个按钮设为默认（回车=取消），
+        // 这样按回车不会误退出，必须显式点击"退出"或选中后再回车。
+        let quitAction = alert.addButton(withTitle: "退出")
+        let cancelAction = alert.addButton(withTitle: "取消")
+        quitAction.keyEquivalent = ""
+        cancelAction.keyEquivalent = "\r"
+
+        let handleResponse: (NSApplication.ModalResponse) -> Void = { response in
+            if response == .alertFirstButtonReturn {
+                NSApp.terminate(nil)
+            }
+        }
+
+        if let window {
+            alert.beginSheetModal(for: window, completionHandler: handleResponse)
+        } else {
+            handleResponse(alert.runModal())
+        }
+    }
+
 
     func speechPage() -> NSView {
         let page = pageView(title: "语音")
