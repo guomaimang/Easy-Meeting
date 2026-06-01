@@ -15,7 +15,9 @@ extension SettingsWindowController {
             azureSpeechKey: azureKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines),
             azureSpeechRegion: azureSpeechRegion.isEmpty ? AppSettings.defaults.azureSpeechRegion : azureSpeechRegion,
             overlayOpacity: opacitySlider.doubleValue,
-            overlayFontSize: fontSizeSlider.doubleValue
+            overlayFontSize: fontSizeSlider.doubleValue,
+            overlayNotesEnabled: notesEnabledCheckbox.state == .on,
+            overlayNotesText: notesTextView.string
         )
     }
 

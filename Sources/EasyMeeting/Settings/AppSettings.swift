@@ -12,6 +12,10 @@ struct AppSettings {
     var azureSpeechRegion: String
     var overlayOpacity: Double
     var overlayFontSize: Double
+    /// 悬浮窗右侧"备注"栏开关，关闭时回到两栏布局。
+    var overlayNotesEnabled: Bool
+    /// 备注栏要显示的演示稿 / 提词文本，多行长文本。
+    var overlayNotesText: String
 
     static let defaults = AppSettings(
         speechProvider: .volcengine,
@@ -22,7 +26,9 @@ struct AppSettings {
         azureSpeechKey: "",
         azureSpeechRegion: "eastasia",
         overlayOpacity: 0.82,
-        overlayFontSize: 22
+        overlayFontSize: 22,
+        overlayNotesEnabled: false,
+        overlayNotesText: ""
     )
 
     var effectiveAzureSpeechRegion: String {

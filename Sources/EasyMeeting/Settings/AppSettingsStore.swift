@@ -12,6 +12,8 @@ final class AppSettingsStore {
         static let azureSpeechRegion = "azureSpeechRegion"
         static let overlayOpacity = "overlayOpacity"
         static let overlayFontSize = "overlayFontSize"
+        static let overlayNotesEnabled = "overlayNotesEnabled"
+        static let overlayNotesText = "overlayNotesText"
     }
 
     private let defaults = UserDefaults.standard
@@ -35,6 +37,9 @@ final class AppSettingsStore {
         )
         let overlayOpacity = defaults.object(forKey: Keys.overlayOpacity) as? Double ?? fallback.overlayOpacity
         let overlayFontSize = defaults.object(forKey: Keys.overlayFontSize) as? Double ?? fallback.overlayFontSize
+        let overlayNotesEnabled = defaults.object(forKey: Keys.overlayNotesEnabled) as? Bool
+            ?? fallback.overlayNotesEnabled
+        let overlayNotesText = defaults.string(forKey: Keys.overlayNotesText) ?? fallback.overlayNotesText
 
         settings = AppSettings(
             speechProvider: provider,
@@ -45,7 +50,9 @@ final class AppSettingsStore {
             azureSpeechKey: azureSpeechKey,
             azureSpeechRegion: azureSpeechRegion,
             overlayOpacity: Self.clampedOpacity(overlayOpacity),
-            overlayFontSize: Self.clampedFontSize(overlayFontSize)
+            overlayFontSize: Self.clampedFontSize(overlayFontSize),
+            overlayNotesEnabled: overlayNotesEnabled,
+            overlayNotesText: overlayNotesText
         )
     }
 
@@ -58,6 +65,8 @@ final class AppSettingsStore {
         defaults.set(azureSpeechRegion, forKey: Keys.azureSpeechRegion)
         defaults.set(Self.clampedOpacity(settings.overlayOpacity), forKey: Keys.overlayOpacity)
         defaults.set(Self.clampedFontSize(settings.overlayFontSize), forKey: Keys.overlayFontSize)
+        defaults.set(settings.overlayNotesEnabled, forKey: Keys.overlayNotesEnabled)
+        defaults.set(settings.overlayNotesText, forKey: Keys.overlayNotesText)
         try KeychainStore.write(settings.volcengineAPIKey, account: Keys.volcengineAPIKey)
         try KeychainStore.write(settings.azureSpeechKey, account: Keys.azureSpeechKey)
         self.settings = AppSettings(
@@ -69,7 +78,9 @@ final class AppSettingsStore {
             azureSpeechKey: settings.azureSpeechKey,
             azureSpeechRegion: azureSpeechRegion,
             overlayOpacity: Self.clampedOpacity(settings.overlayOpacity),
-            overlayFontSize: Self.clampedFontSize(settings.overlayFontSize)
+            overlayFontSize: Self.clampedFontSize(settings.overlayFontSize),
+            overlayNotesEnabled: settings.overlayNotesEnabled,
+            overlayNotesText: settings.overlayNotesText
         )
     }
 

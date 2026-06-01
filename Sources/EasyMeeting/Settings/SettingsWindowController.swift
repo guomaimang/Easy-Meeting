@@ -1,7 +1,7 @@
 import AppKit
 
 @MainActor
-final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
+final class SettingsWindowController: NSWindowController, NSTextFieldDelegate, NSTextViewDelegate {
     let settingsStore: AppSettingsStore
     let audioDeviceManager: AudioDeviceManager
     let overlayController: OverlayWindowController
@@ -28,6 +28,9 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     let helperStatusField = NSTextField(labelWithString: "")
     let microphoneStatusField = NSTextField(labelWithString: "")
     let audioDevicePopUp = NSPopUpButton()
+    let notesEnabledCheckbox = NSButton(checkboxWithTitle: "", target: nil, action: nil)
+    let notesScrollView = NSScrollView()
+    let notesTextView = NSTextView()
     let statusLabel = NSTextField(labelWithString: "")
     var sectionButtons: [SettingsSection: NSControl] = [:]
     var selectedSection: SettingsSection = .app
@@ -92,6 +95,8 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
             try settingsStore.save(settings)
             overlayController.setOpacity(CGFloat(settings.overlayOpacity))
             overlayController.setFontSize(CGFloat(settings.overlayFontSize))
+            overlayController.setNotesEnabled(settings.overlayNotesEnabled)
+            overlayController.setNotesText(settings.overlayNotesText)
             helperStatusField.stringValue = currentDiagnostic(for: settings)
             statusLabel.stringValue = successStatus
             return true
@@ -219,6 +224,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         audioDevicePopUp.target = self
         audioDevicePopUp.action = #selector(selectAudioDevice)
         helperStatusField.lineBreakMode = .byTruncatingMiddle
+        setupNotesControls()
     }
 
     private func loadSettings() {
@@ -235,6 +241,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         setAPIKey(currentProviderKeyDraft())
         opacitySlider.doubleValue = settings.overlayOpacity
         fontSizeSlider.doubleValue = settings.overlayFontSize
+        loadNotesIntoUI(from: settings)
         helperStatusField.stringValue = currentDiagnostic(for: settings)
         microphoneStatusField.stringValue = audioDeviceManager.authorization.title
         reloadAudioDevices()
@@ -257,6 +264,8 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
             page = speechPage()
         case .microphone:
             page = microphonePage()
+        case .notes:
+            page = notesPage()
         }
         page.frame = contentContainer.bounds
         page.autoresizingMask = [.width, .height]

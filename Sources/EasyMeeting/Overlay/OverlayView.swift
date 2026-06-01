@@ -1,19 +1,29 @@
 import AppKit
 
 final class OverlayView: NSView {
-    private enum Layout {
+    enum Layout {
         static let horizontalInset: CGFloat = 18
         static let topMargin: CGFloat = 8
         static let toolbarHeight: CGFloat = 26
         static let toolbarGap: CGFloat = 10
         static let bottomInset: CGFloat = 18
         static let columnGap: CGFloat = 18
+        static let minColumnWidth: CGFloat = 120
     }
 
     var opacity: CGFloat = 0.82
     var fontSize: CGFloat = 22 {
         didSet {
             applyFonts()
+            needsLayout = true
+        }
+    }
+    /// 是否显示右侧"备注"栏。关闭时回到原文 / 译文两栏布局。
+    var notesEnabled: Bool = false {
+        didSet {
+            guard notesEnabled != oldValue else { return }
+            notesScrollView.isHidden = !notesEnabled
+            notesSeparatorView.isHidden = !notesEnabled
             needsLayout = true
         }
     }
@@ -34,19 +44,21 @@ final class OverlayView: NSView {
         }
     }
 
-    private let toolbar = OverlayToolbarView()
-    private let sourceScrollView = OverlayScrollView()
-    private let translationScrollView = OverlayScrollView()
-    private let sourceContentView = OverlayContentView()
-    private let translationContentView = OverlayContentView()
-    private let sourceLabel = NSTextField(wrappingLabelWithString: "")
-    private let translationLabel = NSTextField(wrappingLabelWithString: "")
-    private let separatorView = NSView()
+    let toolbar = OverlayToolbarView()
+    let sourceScrollView = OverlayScrollView()
+    let translationScrollView = OverlayScrollView()
+    let notesScrollView = OverlayScrollView()
+    let sourceContentView = OverlayContentView()
+    let translationContentView = OverlayContentView()
+    let notesContentView = OverlayContentView()
+    let sourceLabel = NSTextField(wrappingLabelWithString: "")
+    let translationLabel = NSTextField(wrappingLabelWithString: "")
+    let notesLabel = NSTextField(wrappingLabelWithString: "")
+    let separatorView = NSView()
+    let notesSeparatorView = NSView()
     private var dragStartLocation: NSPoint?
     private var dragStartFrame: NSRect?
     private var dragEdges: OverlayResizeEdges = []
-
-    // PLACEHOLDER_BODY
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -96,6 +108,14 @@ final class OverlayView: NSView {
         }
     }
 
+    /// 更新备注栏文本。备注属于演示稿，由用户自己掌控阅读位置，
+    /// 这里不主动滚动到底部，避免打断当前阅读。
+    func updateNotes(_ text: String) {
+        guard notesLabel.stringValue != text else { return }
+        notesLabel.stringValue = text
+        needsLayout = true
+    }
+
     /// 刷新顶栏麦克风下拉。
     func updateDevices(_ devices: [AudioInputDevice], selectedID: String?) {
         toolbar.updateDevices(devices, selectedID: selectedID)
@@ -103,11 +123,12 @@ final class OverlayView: NSView {
 
     override func scrollWheel(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
-        if point.x < bounds.midX {
-            sourceScrollView.scrollWheel(with: event)
-        } else {
-            translationScrollView.scrollWheel(with: event)
-        }
+        let columns: [OverlayScrollView] = notesEnabled
+            ? [sourceScrollView, translationScrollView, notesScrollView]
+            : [sourceScrollView, translationScrollView]
+        let columnSpan = max(bounds.width / CGFloat(columns.count), 1)
+        let index = max(min(Int(point.x / columnSpan), columns.count - 1), 0)
+        columns[index].scrollWheel(with: event)
     }
 
     override func mouseDown(with event: NSEvent) {
@@ -166,105 +187,32 @@ final class OverlayView: NSView {
         let contentLeft = Layout.horizontalInset
         let contentWidth = max(bounds.width - Layout.horizontalInset * 2, 0)
 
+        let columnCount: CGFloat = notesEnabled ? 3 : 2
         let gap = Layout.columnGap
-        let columnWidth = max((contentWidth - gap) / 2, 120)
-        let sourceHeight = max(sourceLabel.heightFor(width: columnWidth), contentHeight)
-        let translationHeight = max(translationLabel.heightFor(width: columnWidth), contentHeight)
+        let columnWidth = max((contentWidth - gap * (columnCount - 1)) / columnCount, Layout.minColumnWidth)
 
-        sourceScrollView.frame = NSRect(x: contentLeft, y: contentTop, width: columnWidth, height: contentHeight)
-        translationScrollView.frame = NSRect(
-            x: contentLeft + columnWidth + gap,
-            y: contentTop,
-            width: columnWidth,
-            height: contentHeight
+        layoutColumn(
+            scrollView: sourceScrollView, content: sourceContentView, label: sourceLabel,
+            x: contentLeft, y: contentTop, width: columnWidth, height: contentHeight
         )
-        sourceContentView.frame = NSRect(x: 0, y: 0, width: columnWidth, height: sourceHeight)
-        translationContentView.frame = NSRect(x: 0, y: 0, width: columnWidth, height: translationHeight)
-        sourceLabel.frame = NSRect(x: 0, y: 0, width: columnWidth, height: sourceHeight)
-        translationLabel.frame = NSRect(x: 0, y: 0, width: columnWidth, height: translationHeight)
+        let translationX = contentLeft + columnWidth + gap
+        layoutColumn(
+            scrollView: translationScrollView, content: translationContentView, label: translationLabel,
+            x: translationX, y: contentTop, width: columnWidth, height: contentHeight
+        )
         separatorView.frame = NSRect(
-            x: contentLeft + columnWidth + gap / 2,
-            y: contentTop,
-            width: 1,
-            height: contentHeight
+            x: translationX - gap / 2, y: contentTop, width: 1, height: contentHeight
         )
-    }
 
-    private func setupLabels() {
-        sourceLabel.textColor = .white.withAlphaComponent(0.76)
-        sourceLabel.lineBreakMode = .byWordWrapping
-        sourceLabel.maximumNumberOfLines = 0
-
-        translationLabel.textColor = .white
-        translationLabel.lineBreakMode = .byWordWrapping
-        translationLabel.maximumNumberOfLines = 0
-
-        setupScrollView(sourceScrollView, contentView: sourceContentView)
-        setupScrollView(translationScrollView, contentView: translationContentView)
-        separatorView.wantsLayer = true
-        separatorView.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.14).cgColor
-        applyFonts()
-
-        sourceContentView.addSubview(sourceLabel)
-        translationContentView.addSubview(translationLabel)
-        addSubview(sourceScrollView)
-        addSubview(separatorView)
-        addSubview(translationScrollView)
-        addSubview(toolbar)
-    }
-
-    private func setupScrollView(_ scrollView: OverlayScrollView, contentView: OverlayContentView) {
-        scrollView.drawsBackground = false
-        scrollView.hasVerticalScroller = false
-        scrollView.hasHorizontalScroller = false
-        scrollView.borderType = .noBorder
-        scrollView.autohidesScrollers = true
-        scrollView.documentView = contentView
-    }
-
-    private func applyFonts() {
-        sourceLabel.font = .systemFont(ofSize: fontSize, weight: .regular)
-        translationLabel.font = .systemFont(ofSize: max(fontSize - 1, 13), weight: .semibold)
-    }
-
-    private func resizeEdges(at point: NSPoint) -> OverlayResizeEdges {
-        let zone: CGFloat = 12
-        var edges: OverlayResizeEdges = []
-        if point.x <= zone {
-            edges.insert(.left)
-        } else if point.x >= bounds.width - zone {
-            edges.insert(.right)
+        if notesEnabled {
+            let notesX = translationX + columnWidth + gap
+            layoutColumn(
+                scrollView: notesScrollView, content: notesContentView, label: notesLabel,
+                x: notesX, y: contentTop, width: columnWidth, height: contentHeight
+            )
+            notesSeparatorView.frame = NSRect(
+                x: notesX - gap / 2, y: contentTop, width: 1, height: contentHeight
+            )
         }
-        if point.y <= zone {
-            edges.insert(.top)
-        } else if point.y >= bounds.height - zone {
-            edges.insert(.bottom)
-        }
-        return edges
     }
 }
-
-struct OverlayResizeEdges: OptionSet {
-    let rawValue: Int
-
-    static let left = OverlayResizeEdges(rawValue: 1 << 0)
-    static let right = OverlayResizeEdges(rawValue: 1 << 1)
-    static let top = OverlayResizeEdges(rawValue: 1 << 2)
-    static let bottom = OverlayResizeEdges(rawValue: 1 << 3)
-}
-
-struct OverlayDragGesture {
-    let startFrame: NSRect
-    let startLocation: NSPoint
-    let currentLocation: NSPoint
-    let resizeEdges: OverlayResizeEdges
-}
-
-private extension NSTextField {
-    func heightFor(width: CGFloat) -> CGFloat {
-        guard width > 0 else { return 0 }
-        let size = NSSize(width: width, height: .greatestFiniteMagnitude)
-        return ceil(cell?.cellSize(forBounds: NSRect(origin: .zero, size: size)).height ?? 0)
-    }
-}
-

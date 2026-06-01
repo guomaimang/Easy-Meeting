@@ -61,6 +61,8 @@ final class OverlayWindowController: NSWindowController {
 
         overlayView.opacity = currentOpacity
         overlayView.fontSize = CGFloat(settings.overlayFontSize)
+        overlayView.notesEnabled = settings.overlayNotesEnabled
+        overlayView.updateNotes(settings.overlayNotesText)
         overlayView.onDrag = { [weak self] gesture in
             self?.applyDrag(gesture)
         }
@@ -105,6 +107,16 @@ final class OverlayWindowController: NSWindowController {
 
     func setFontSize(_ fontSize: CGFloat) {
         overlayView.fontSize = min(max(fontSize, 14), 34)
+    }
+
+    /// 切换右侧"备注"栏显隐。
+    func setNotesEnabled(_ enabled: Bool) {
+        overlayView.notesEnabled = enabled
+    }
+
+    /// 更新备注栏文本。
+    func setNotesText(_ text: String) {
+        overlayView.updateNotes(text)
     }
 
     /// 同步录音状态到顶栏按钮，切换三角 / 方块图标。
