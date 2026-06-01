@@ -36,6 +36,11 @@ final class OverlayView: NSView {
         get { toolbar.onSelectDevice }
         set { toolbar.onSelectDevice = newValue }
     }
+    /// 顶栏齿轮按钮点击回调，由窗口控制器转发给状态栏控制器打开设置窗口。
+    var onOpenSettings: (() -> Void)? {
+        get { toolbar.onOpenSettings }
+        set { toolbar.onOpenSettings = newValue }
+    }
 
     /// 录音状态，转发给顶栏切换三角 / 方块图标。
     var isRecording: Bool = false {

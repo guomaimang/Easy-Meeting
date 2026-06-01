@@ -1,8 +1,8 @@
 import AppKit
 
-/// 悬浮窗顶部工具栏：左侧录音开关按钮，紧邻麦克风下拉。
+/// 悬浮窗顶部工具栏：左侧录音开关按钮，紧邻麦克风下拉，右侧齿轮按钮打开设置。
 ///
-/// 无需打开菜单栏即可控制录音与切换麦克风。录音中切麦走热切换，
+/// 无需打开菜单栏即可控制录音、切换麦克风、打开设置。录音中切麦走热切换，
 /// 识别与字幕不中断（详见 docs/audio-hot-swap.md）。
 final class OverlayToolbarView: NSView {
     private enum Layout {
@@ -16,6 +16,8 @@ final class OverlayToolbarView: NSView {
     var onToggleRecording: (() -> Void)?
     /// 麦克风下拉选择回调，回传设备 ID。
     var onSelectDevice: ((String) -> Void)?
+    /// 设置按钮点击回调，由上层打开设置窗口。
+    var onOpenSettings: (() -> Void)?
 
     /// 录音状态，转发给录音按钮切换三角 / 方块。
     var isRecording: Bool = false {
@@ -25,6 +27,7 @@ final class OverlayToolbarView: NSView {
     }
 
     private let recordButton = OverlayRecordButton()
+    private let settingsButton = OverlaySettingsButton()
     private let devicePopUp = NSPopUpButton(frame: .zero, pullsDown: false)
     /// 下拉项顺序对应的设备 ID，索引对齐 devicePopUp.itemArray。
     private var deviceIDs: [String] = []
@@ -81,14 +84,24 @@ final class OverlayToolbarView: NSView {
             height: Layout.buttonSize
         )
 
+        // 麦克风下拉按内容自适应宽度，避免被撑满整条工具栏；齿轮按钮紧贴在它右侧。
         let popUpX = recordButton.frame.maxX + Layout.gap
-        let availableWidth = max(bounds.width - popUpX, 0)
-        let popUpWidth = min(availableWidth, Layout.popUpMaxWidth)
+        let intrinsicWidth = max(devicePopUp.intrinsicContentSize.width, 0)
+        let maxAvailableWidth = max(bounds.width - popUpX - Layout.gap - Layout.buttonSize, 0)
+        let popUpWidth = max(min(intrinsicWidth, Layout.popUpMaxWidth, maxAvailableWidth), 0)
         devicePopUp.frame = NSRect(
             x: popUpX,
             y: (bounds.height - Layout.popUpHeight) / 2,
             width: popUpWidth,
             height: Layout.popUpHeight
+        )
+
+        let settingsX = devicePopUp.frame.maxX + Layout.gap
+        settingsButton.frame = NSRect(
+            x: settingsX,
+            y: (bounds.height - Layout.buttonSize) / 2,
+            width: Layout.buttonSize,
+            height: Layout.buttonSize
         )
     }
 
@@ -107,6 +120,11 @@ final class OverlayToolbarView: NSView {
         devicePopUp.action = #selector(deviceSelectionChanged)
         devicePopUp.toolTip = "切换麦克风"
         addSubview(devicePopUp)
+
+        settingsButton.onOpen = { [weak self] in
+            self?.onOpenSettings?()
+        }
+        addSubview(settingsButton)
     }
 
     @objc private func deviceSelectionChanged() {
@@ -117,3 +135,4 @@ final class OverlayToolbarView: NSView {
         onSelectDevice?(deviceID)
     }
 }
+

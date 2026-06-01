@@ -35,6 +35,9 @@ final class StatusBarController: NSObject {
         overlayController.onOpacityChange = { [weak self] opacity in
             self?.persistOpacity(opacity)
         }
+        overlayController.onOpenSettings = { [weak self] in
+            self?.openSettings()
+        }
         setupStatusItem()
     }
 

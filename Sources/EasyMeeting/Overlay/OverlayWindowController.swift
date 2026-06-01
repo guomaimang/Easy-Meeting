@@ -3,8 +3,8 @@ import AppKit
 final class OverlayWindowController: NSWindowController {
     private enum Layout {
         static let defaultSize = NSSize(width: 760, height: 184)
-        static let minimumSize = NSSize(width: 420, height: 140)
-        static let maximumSize = NSSize(width: 1280, height: 360)
+        /// 最小尺寸即默认初始尺寸，禁止再向下缩小；同时不设最大尺寸上限，允许自由放大。
+        static let minimumSize = defaultSize
         static let moveStep: CGFloat = 24
         static let opacityStep: CGFloat = 0.05
     }
@@ -23,6 +23,12 @@ final class OverlayWindowController: NSWindowController {
     var onSelectDevice: ((String) -> Void)? {
         get { overlayView.onSelectDevice }
         set { overlayView.onSelectDevice = newValue }
+    }
+
+    /// 悬浮窗顶栏齿轮按钮的点击回调，由状态栏控制器调用 `SettingsWindowController.show()`。
+    var onOpenSettings: (() -> Void)? {
+        get { overlayView.onOpenSettings }
+        set { overlayView.onOpenSettings = newValue }
     }
 
     /// 快捷键调整透明度后的回调，由状态栏控制器负责持久化到 UserDefaults。
@@ -205,8 +211,8 @@ final class OverlayWindowController: NSWindowController {
             next.size.height = frame.height + dy
         }
 
-        next.size.width = min(max(next.width, Layout.minimumSize.width), Layout.maximumSize.width)
-        next.size.height = min(max(next.height, Layout.minimumSize.height), Layout.maximumSize.height)
+        next.size.width = max(next.width, Layout.minimumSize.width)
+        next.size.height = max(next.height, Layout.minimumSize.height)
 
         if edges.contains(.left) {
             next.origin.x = frame.maxX - next.width

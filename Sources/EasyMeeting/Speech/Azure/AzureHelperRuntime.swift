@@ -48,18 +48,11 @@ enum AzureHelperRuntime {
     private static func candidateURLs() -> [URL] {
         var urls: [URL] = []
 
-        // 分发包：放在 Contents/Resources/，避免 codesign 把含 package.json 的
-        // node 目录误判为嵌套 bundle。
+        // .app 包：debug 与 release 已对齐，统一放在 Contents/Resources/，避免
+        // codesign 把含 package.json 的 node_modules 误判为嵌套 bundle。
         urls.append(Bundle.main.bundleURL
             .appendingPathComponent("Contents")
             .appendingPathComponent("Resources")
-            .appendingPathComponent(helperDirectoryName)
-            .appendingPathComponent(scriptName))
-
-        // 开发组装包：放在 Contents/Helpers/（package-app.sh，不签名）。
-        urls.append(Bundle.main.bundleURL
-            .appendingPathComponent("Contents")
-            .appendingPathComponent("Helpers")
             .appendingPathComponent(helperDirectoryName)
             .appendingPathComponent(scriptName))
 
