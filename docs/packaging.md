@@ -131,10 +131,15 @@ logo 居中），再经 `sips` 生成各尺寸、`iconutil` 打包为 `Packaging
 
 ## 菜单栏与权限
 
-应用在入口代码中使用 `.accessory` activation policy，保持无 Dock 常驻状态栏的使用方式。
-`Info.plist` 不声明 `LSUIElement`，避免 `.app` 由 LaunchServices 启动时被当作 agent 应用，
-导致标准应用菜单栏不显示。启动后右上角状态栏显示 `EM` 入口，应用窗口获得焦点时显示
-`Easy Meeting` 与「编辑」菜单。
+应用以 macOS agent 形态运行：`Info.plist` 声明 `LSUIElement=YES`，入口代码再
+`setActivationPolicy(.accessory)` 兜底。两者一致地确保应用**无 Dock 图标、不占据屏幕
+顶部系统菜单栏**，所有用户入口集中在屏幕右上角状态栏的 `EM` 图标里（设置、显示/隐藏
+悬浮窗、开始/停止录音、翻译模式、麦克风、最近会议、退出）。
+
+> 注意：曾尝试只删除 `LSUIElement` 来让顶部菜单栏显示，结果与 `.accessory` 时序冲突，
+> 反而导致状态栏 `EM` 图标在 `.app` 启动后不出现。`.accessory` 与"顶部菜单可见"在
+> macOS 上互斥，本项目选择前者。`AppDelegate.setupMainMenu()` 构建的 `Easy Meeting`
+> 与「编辑」菜单仅用于注册 `Cmd+C/V/A` 等文本快捷键的响应链，不会显示在屏幕顶部。
 
 首次开始录音时，系统会请求麦克风权限，需在「系统设置 → 隐私与安全性 → 麦克风」中授权。
 
