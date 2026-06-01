@@ -15,7 +15,6 @@ final class OverlayView: NSView {
     var fontSize: CGFloat = 22 {
         didSet {
             applyFonts()
-            needsLayout = true
         }
     }
     /// 是否显示右侧"备注"栏。关闭时回到原文 / 译文两栏布局。
@@ -53,14 +52,14 @@ final class OverlayView: NSView {
     let sourceScrollView = OverlayScrollView()
     let translationScrollView = OverlayScrollView()
     let notesScrollView = OverlayScrollView()
-    let sourceContentView = OverlayContentView()
-    let translationContentView = OverlayContentView()
-    let notesContentView = OverlayContentView()
-    let sourceLabel = NSTextField(wrappingLabelWithString: "")
-    let translationLabel = NSTextField(wrappingLabelWithString: "")
-    let notesLabel = NSTextField(wrappingLabelWithString: "")
     let separatorView = NSView()
     let notesSeparatorView = NSView()
+
+    /// 缓存当前文本，字号变化时重新应用样式而不丢内容。
+    var currentSourceText = ""
+    var currentTranslationText = ""
+    var currentNotesText = ""
+
     private var dragStartLocation: NSPoint?
     private var dragStartFrame: NSRect?
     private var dragEdges: OverlayResizeEdges = []
@@ -68,7 +67,7 @@ final class OverlayView: NSView {
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true
-        setupLabels()
+        setupSubtitleViews()
     }
 
     required init?(coder: NSCoder) {
@@ -97,28 +96,19 @@ final class OverlayView: NSView {
     }
 
     func update(source: String, translation: String) {
-        let sourceShouldFollow = sourceScrollView.isPinnedToBottom
-        let translationShouldFollow = translationScrollView.isPinnedToBottom
-        sourceLabel.stringValue = source
-        translationLabel.stringValue = translation
-        needsLayout = true
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            if sourceShouldFollow {
-                sourceScrollView.scrollToBottom()
-            }
-            if translationShouldFollow {
-                translationScrollView.scrollToBottom()
-            }
-        }
+        currentSourceText = source
+        currentTranslationText = translation
+        sourceScrollView.updateText(source, font: sourceFont, color: sourceColor)
+        translationScrollView.updateText(translation, font: translationFont, color: translationColor)
     }
 
     /// 更新备注栏文本。备注属于演示稿，由用户自己掌控阅读位置，
-    /// 这里不主动滚动到底部，避免打断当前阅读。
+    /// updateText 只在内容改变时才会触发滚动跟随判断，备注栏一般不会贴底，
+    /// 因而不会主动打断当前阅读。
     func updateNotes(_ text: String) {
-        guard notesLabel.stringValue != text else { return }
-        notesLabel.stringValue = text
-        needsLayout = true
+        guard currentNotesText != text else { return }
+        currentNotesText = text
+        notesScrollView.updateText(text, font: notesFont, color: notesColor)
     }
 
     /// 刷新顶栏麦克风下拉。
@@ -197,12 +187,12 @@ final class OverlayView: NSView {
         let columnWidth = max((contentWidth - gap * (columnCount - 1)) / columnCount, Layout.minColumnWidth)
 
         layoutColumn(
-            scrollView: sourceScrollView, content: sourceContentView, label: sourceLabel,
+            scrollView: sourceScrollView,
             x: contentLeft, y: contentTop, width: columnWidth, height: contentHeight
         )
         let translationX = contentLeft + columnWidth + gap
         layoutColumn(
-            scrollView: translationScrollView, content: translationContentView, label: translationLabel,
+            scrollView: translationScrollView,
             x: translationX, y: contentTop, width: columnWidth, height: contentHeight
         )
         separatorView.frame = NSRect(
@@ -212,7 +202,7 @@ final class OverlayView: NSView {
         if notesEnabled {
             let notesX = translationX + columnWidth + gap
             layoutColumn(
-                scrollView: notesScrollView, content: notesContentView, label: notesLabel,
+                scrollView: notesScrollView,
                 x: notesX, y: contentTop, width: columnWidth, height: contentHeight
             )
             notesSeparatorView.frame = NSRect(

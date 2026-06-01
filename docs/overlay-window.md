@@ -11,7 +11,7 @@ Easy Meeting 的透明悬浮窗，常驻桌面显示实时原文与译文。
 - `OverlayToolbarView`：顶部工具栏，承载录音按钮、麦克风下拉与设置入口。
 - `OverlayRecordButton`：录音开关按钮。
 - `OverlaySettingsButton`：设置入口按钮，绘制齿轮图标，点击直接打开设置窗口。
-- `OverlayScrollView`：字幕滚动视图，支持「贴底自动跟随」。
+- `OverlayScrollView`：字幕滚动视图，内部 `documentView` 使用 `NSTextView`（`OverlaySubtitleTextView`）承载字幕，走 TextKit 增量排版以保证长字幕与窗口缩放下仍然流畅。提供 `updateText(_:font:color:)` 与 `scrollToBottom()`，支持「贴底自动跟随」：写入文本前快照 `isPinnedToBottom`，写入后通过 `layoutManager.ensureLayout(for:)` 强制完成可见区排版再滚到底，避免读到旧 `contentSize` 导致跟随失效。
 
 ## 顶部工具栏
 

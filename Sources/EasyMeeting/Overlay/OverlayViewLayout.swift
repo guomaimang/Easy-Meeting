@@ -1,54 +1,44 @@
 import AppKit
 
 extension OverlayView {
-    func setupLabels() {
-        sourceLabel.textColor = .white.withAlphaComponent(0.76)
-        sourceLabel.lineBreakMode = .byWordWrapping
-        sourceLabel.maximumNumberOfLines = 0
+    /// 字幕字体：原文用常规、译文加粗略小、备注与原文同字号。
+    var sourceFont: NSFont { .systemFont(ofSize: fontSize, weight: .regular) }
+    var translationFont: NSFont { .systemFont(ofSize: max(fontSize - 1, 13), weight: .semibold) }
+    var notesFont: NSFont { .systemFont(ofSize: fontSize, weight: .regular) }
 
-        translationLabel.textColor = .white
-        translationLabel.lineBreakMode = .byWordWrapping
-        translationLabel.maximumNumberOfLines = 0
+    /// 字幕颜色：原文偏淡、译文最显眼、备注同译文亮度。
+    var sourceColor: NSColor { .white.withAlphaComponent(0.76) }
+    var translationColor: NSColor { .white }
+    var notesColor: NSColor { .white }
 
-        notesLabel.textColor = .white
-        notesLabel.lineBreakMode = .byWordWrapping
-        notesLabel.maximumNumberOfLines = 0
-
-        setupScrollView(sourceScrollView, contentView: sourceContentView)
-        setupScrollView(translationScrollView, contentView: translationContentView)
-        setupScrollView(notesScrollView, contentView: notesContentView)
+    /// 装配三列字幕视图与两根分隔线，并把工具栏放最上层。
+    /// 真实文本在 `update(source:translation:)` / `updateNotes` 时通过
+    /// `OverlayScrollView.updateText` 写入，这里只负责样式与层级。
+    func setupSubtitleViews() {
         notesScrollView.isHidden = true
         notesSeparatorView.isHidden = true
+
         separatorView.wantsLayer = true
         separatorView.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.14).cgColor
         notesSeparatorView.wantsLayer = true
         notesSeparatorView.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.14).cgColor
-        applyFonts()
 
-        sourceContentView.addSubview(sourceLabel)
-        translationContentView.addSubview(translationLabel)
-        notesContentView.addSubview(notesLabel)
         addSubview(sourceScrollView)
         addSubview(separatorView)
         addSubview(translationScrollView)
         addSubview(notesSeparatorView)
         addSubview(notesScrollView)
         addSubview(toolbar)
+
+        applyFonts()
     }
 
-    func setupScrollView(_ scrollView: OverlayScrollView, contentView: OverlayContentView) {
-        scrollView.drawsBackground = false
-        scrollView.hasVerticalScroller = false
-        scrollView.hasHorizontalScroller = false
-        scrollView.borderType = .noBorder
-        scrollView.autohidesScrollers = true
-        scrollView.documentView = contentView
-    }
-
+    /// 字号变化时刷新已显示文本的样式。`OverlayScrollView.updateText` 在内容
+    /// 未变时只走属性更新，长字幕场景下成本极低。
     func applyFonts() {
-        sourceLabel.font = .systemFont(ofSize: fontSize, weight: .regular)
-        translationLabel.font = .systemFont(ofSize: max(fontSize - 1, 13), weight: .semibold)
-        notesLabel.font = .systemFont(ofSize: fontSize, weight: .regular)
+        sourceScrollView.updateText(currentSourceText, font: sourceFont, color: sourceColor)
+        translationScrollView.updateText(currentTranslationText, font: translationFont, color: translationColor)
+        notesScrollView.updateText(currentNotesText, font: notesFont, color: notesColor)
     }
 
     func resizeEdges(at point: NSPoint) -> OverlayResizeEdges {
@@ -67,19 +57,18 @@ extension OverlayView {
         return edges
     }
 
+    /// 单列字幕布局：只设置 NSScrollView 的 frame，textView 由 TextKit
+    /// 通过 `widthTracksTextView` + `autoresizingMask` 自适应宽高，
+    /// 不再像旧版那样调用 NSTextField 的 `cellSize(forBounds:)` 计算高度，
+    /// 长字幕和窗口缩放都不会阻塞主线程。
     func layoutColumn(
         scrollView: OverlayScrollView,
-        content: OverlayContentView,
-        label: NSTextField,
         x: CGFloat,
         y: CGFloat,
         width: CGFloat,
         height: CGFloat
     ) {
-        let labelHeight = max(label.heightFor(width: width), height)
         scrollView.frame = NSRect(x: x, y: y, width: width, height: height)
-        content.frame = NSRect(x: 0, y: 0, width: width, height: labelHeight)
-        label.frame = NSRect(x: 0, y: 0, width: width, height: labelHeight)
     }
 }
 
@@ -97,12 +86,4 @@ struct OverlayDragGesture {
     let startLocation: NSPoint
     let currentLocation: NSPoint
     let resizeEdges: OverlayResizeEdges
-}
-
-extension NSTextField {
-    func heightFor(width: CGFloat) -> CGFloat {
-        guard width > 0 else { return 0 }
-        let size = NSSize(width: width, height: .greatestFiniteMagnitude)
-        return ceil(cell?.cellSize(forBounds: NSRect(origin: .zero, size: size)).height ?? 0)
-    }
 }

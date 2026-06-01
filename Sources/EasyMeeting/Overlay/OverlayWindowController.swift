@@ -12,6 +12,9 @@ final class OverlayWindowController: NSWindowController {
     private let overlayView = OverlayView()
     private var hotKeyController: OverlayHotKeyController?
     private var currentOpacity: CGFloat
+    /// 用户主动隐藏标记。一旦置位，后续字幕/状态推送只更新内容，不再把窗口拉回前台；
+    /// 仅有 `toggleVisibility()` 切回显示态时才会清零。详见 changelog 同名条目。
+    private var isUserHidden = false
 
     /// 悬浮窗顶栏录音按钮的点击回调，由状态栏控制器接管录音切换。
     var onToggleRecording: (() -> Void)? {
@@ -100,7 +103,9 @@ final class OverlayWindowController: NSWindowController {
 
         if window.isVisible {
             window.orderOut(nil)
+            isUserHidden = true
         } else {
+            isUserHidden = false
             window.orderFrontRegardless()
         }
     }
@@ -135,12 +140,10 @@ final class OverlayWindowController: NSWindowController {
         overlayView.updateDevices(devices, selectedID: selectedID)
     }
 
-    func showReadyStatus() {
-        showStatus(source: "Easy Meeting is ready.", translation: "会议助手已准备就绪。")
-    }
-
     func showStatus(source: String, translation: String) {
         overlayView.update(source: source, translation: translation)
+        // 用户主动隐藏后，字幕/状态推送只刷新内容，不要把窗口重新拉回前台。
+        guard !isUserHidden else { return }
         show()
     }
 
